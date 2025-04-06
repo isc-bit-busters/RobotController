@@ -1,3 +1,6 @@
+# Hardware Setup
+⚠️ https://www.waveshare.com/wiki/AlphaBot2-Pi#Hardware_setup ⚠️
+
 # AlphaPi Zero Agent
 
 A SPADE-based XMPP agent for controlling an AlphaBot2 robot using the Raspberry Pi Zero.
@@ -37,7 +40,7 @@ This project implements a SPADE (Smart Python Agent Development Environment) age
    cd AlphaPiZeroAgent
    ```
 
-2. Configure the XMPP settings in `docker-compose.yml`:
+2. Configure the XMPP settings in `docker-compose.yml`: (Leave as it is unless configured)
    ```yaml
    environment:
      XMPP_SERVER: "prosody"
