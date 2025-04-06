@@ -10,9 +10,13 @@ services:
     cap_add:
       - SYS_RAWIO
     environment:
-      XMPP_SERVER: prosody
+      XMPP_SERVER: "prosody"
       XMPP_PORT: 5222
-      XMPP_JID: "alpha-pi-zero-agent@prosody"
+      XMPP_DOMAIN: "prosody"
+      XMPP_USERNAME: "alpha-pi-zero-agent"
       XMPP_PASSWORD: "top_secret"
+      PYTHONUNBUFFERED: 1
     volumes:
       - ./agent:/agent
+    extra_hosts:
+      - "prosody:192.168.88.253"

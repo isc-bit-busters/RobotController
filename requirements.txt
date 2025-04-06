@@ -1,4 +1,4 @@
 RPi.GPIO
 spidev
 rpi_ws281x
-spade
+spade==3.3.3
