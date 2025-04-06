@@ -34,13 +34,20 @@ This project implements a SPADE (Smart Python Agent Development Environment) age
 
 ### Using Docker (Recommended)
 
-1. Clone this repository:
+0. Install Docker:
+   ```
+   curl -sSL https://get.docker.com | sh
+   sudo usermod -aG docker $USER
+   restart terminal
+   ```
+   
+2. Clone this repository:
    ```
    git clone <repository-url>
    cd AlphaPiZeroAgent
    ```
 
-2. Configure the XMPP settings in `docker-compose.yml`: (Leave as it is unless configured)
+3. Configure the XMPP settings in `docker-compose.yml`: (Leave as it is unless configured)
    ```yaml
    environment:
      XMPP_SERVER: "prosody"
@@ -50,7 +57,7 @@ This project implements a SPADE (Smart Python Agent Development Environment) age
      XMPP_PASSWORD: "top_secret"
    ```
 
-3. Build and run with Docker Compose:
+4. Build and run with Docker Compose:
    ```
    docker-compose up -d
    ```
