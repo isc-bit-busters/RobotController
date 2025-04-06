@@ -82,7 +82,8 @@ class PCA9685:
     self.setPWM(channel, 0, pulse)
 
 if __name__=='__main__':
- 
+  
+  ### PANTILT CODE IS HERE
   pwm = PCA9685(0x40, debug=True)
   pwm.setPWMFreq(50)
   while True:

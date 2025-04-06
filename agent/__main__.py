@@ -18,23 +18,6 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
     log.propagate = True
 
 class AlphaBotAgent(Agent):
-    class HeartbeatBehaviour(PeriodicBehaviour):
-        async def on_start(self):
-            logger.info("[Heartbeat] Starting heartbeat behavior")
-            
-        async def run(self):
-            logger.debug("[Heartbeat] Sending heartbeat message")
-            try:
-                # Create heartbeat message to self
-                msg = Message(to=str(self.agent.jid))
-                msg.set_metadata("performative", "inform")
-                msg.body = "heartbeat"
-                
-                await self.send(msg)
-                logger.debug("[Heartbeat] Heartbeat message sent successfully")
-            except Exception as e:
-                logger.error(f"[Heartbeat] Error sending heartbeat: {str(e)}")
-
     class XMPPCommandListener(CyclicBehaviour):
         async def on_start(self):
             logger.info("[Behavior] Initializing AlphaBot2...")
@@ -45,7 +28,7 @@ class AlphaBotAgent(Agent):
             logger.debug("[Behavior] Waiting for messages...")
             msg = await self.receive(timeout=10)
             if msg:
-                logger.info(f"[Behavior] Received command: {msg.body}")
+                logger.info(f"[Behavior] Received command ({msg.sender}): {msg.body}")
                 await self.process_command(msg.body)
                 
                 # Send a confirmation response
@@ -111,45 +94,19 @@ class AlphaBotAgent(Agent):
         command_behavior = self.XMPPCommandListener()
         self.add_behaviour(command_behavior)
         
-        # Add heartbeat behavior that runs every 30 seconds
-        heartbeat_behavior = self.HeartbeatBehaviour(period=30)
-        self.add_behaviour(heartbeat_behavior)
-        
         logger.info("[Agent] Behaviors added, setup complete.")
 
 import asyncio
 
 async def main():
-    # Get XMPP credentials from environment variables
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
     xmpp_username = os.environ.get("XMPP_USERNAME", "alpha-pi-zero-agent")
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
     
-    # Check for XMPP server in environment (can be different from domain)
-    xmpp_server = os.environ.get("XMPP_SERVER", "prosody")
-    xmpp_port = int(os.environ.get("XMPP_PORT", "5222"))
-    
     logger.info("Starting AlphaBot XMPP Agent")
     logger.info(f"XMPP JID: {xmpp_jid}")
     logger.info(f"XMPP Password: {'*' * len(xmpp_password)}")
-    logger.info(f"XMPP Server: {xmpp_server}")
-    logger.info(f"XMPP Port: {xmpp_port}")
-    
-    # Test server connectivity
-    logger.info(f"Testing connection to XMPP server {xmpp_server}...")
-    try:
-        import socket
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.settimeout(5)
-        result = s.connect_ex((xmpp_server, xmpp_port))
-        if result == 0:
-            logger.info(f"Successfully connected to {xmpp_server}:{xmpp_port}")
-        else:
-            logger.error(f"Could not connect to {xmpp_server}:{xmpp_port}, error code: {result}")
-        s.close()
-    except Exception as e:
-        logger.error(f"Error testing connection: {str(e)}")
     
     try:
         agent = AlphaBotAgent(
