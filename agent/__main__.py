@@ -1,3 +1,4 @@
+from agent.alphabotlib.Camera import get_picture_base64
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour, PeriodicBehaviour
 from spade.message import Message
@@ -6,6 +7,7 @@ import asyncio
 import os
 import time
 import logging
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -29,7 +31,7 @@ class AlphaBotAgent(Agent):
             msg = await self.receive(timeout=10)
             if msg:
                 logger.info(f"[Behavior] Received command ({msg.sender}): {msg.body}")
-                await self.process_command(msg.body)
+                await self.process_command(msg)
                 
                 # Send a confirmation response
                 reply = Message(to=str(msg.sender))
@@ -40,9 +42,11 @@ class AlphaBotAgent(Agent):
             else:
                 logger.debug("[Behavior] No message received during timeout.")
         
-        async def process_command(self, command):
-            command = command.strip().lower()
-            
+        async def process_command(self, message):
+            command = message.body.strip().lower()
+            thread = message.thread
+            sender = str(message.sender)
+
             if command == "forward":
                 logger.info("[Behavior] Moving forward...")
                 self.ab.forward()
@@ -78,6 +82,19 @@ class AlphaBotAgent(Agent):
                     self.ab.stop()
                 except (ValueError, IndexError):
                     logger.error("[Behavior] Invalid motor command format. Use 'motor <left_speed> <right_speed>'")
+
+            elif command == "takepic":
+                logger.info("[Behavior] Taking picture...")
+                encoded_img = await get_picture_base64()
+
+                msg = Message(to=sender)
+                msg.body = encoded_img
+                msg.thread = thread
+
+                await self.send(msg)
+                print("Picture sent.")
+
+                pass
                     
             elif command == "stop":
                 logger.info("[Behavior] Stopping...")
@@ -95,8 +112,6 @@ class AlphaBotAgent(Agent):
         self.add_behaviour(command_behavior)
         
         logger.info("[Agent] Behaviors added, setup complete.")
-
-import asyncio
 
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
