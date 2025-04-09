@@ -6,8 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Prioriser les paquets Raspberry Pi
 RUN echo 'Package: *\nPin: origin "archive.raspberrypi.org"\nPin-Priority: 1001' > /etc/apt/preferences.d/raspi.pref
-
-# Mettez à jour et installez les dépendances nécessaires
+# Dépendances système
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-smbus \
@@ -31,21 +30,32 @@ RUN apt-get update && apt-get install -y \
     libfontconfig1-dev \
     libfreetype6-dev \
     ffmpeg \
-    libcamera-dev \
-    libcamera-apps \
-    python3-libcamera \
-    python3-picamera2 \
+    meson \
+    ninja-build \
+    python3-pybind11 \
+    python3-jinja2 \
+    python3-yaml \
+    python3-ply \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Définir le répertoire de travail
+# Installer libcamera depuis la source
+WORKDIR /opt
+RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
+    cd libcamera && \
+    meson setup build && \
+    ninja -C build install
+
+# Corriger le lien pour Python (libcamera bindings)
+ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
+
+# Installer picamera2 via pip (qui utilise libcamera compilé)
+RUN pip3 install --no-cache-dir picamera2
+
+# Appli
 WORKDIR /app
-
-# Copier les fichiers Python
 COPY requirements.txt .
-
 RUN pip3 install --no-cache-dir -r requirements.txt
-
 COPY agent/ ./agent/
 
 CMD ["python3", "-m", "agent.camera_streamer"]
