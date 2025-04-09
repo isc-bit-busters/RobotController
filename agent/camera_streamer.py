@@ -1,10 +1,14 @@
+# =========================
+# 📦 Fichier : agent/camera_streamer.py
+# =========================
+
 import cv2
 import base64
 import asyncio
+import os
 from threading import Thread
 from picamera2 import Picamera2
 from slixmpp import ClientXMPP
-import os
 
 class CameraBot(ClientXMPP):
     def __init__(self, jid, password, recipient, robot_id, camera_index=0):
@@ -18,7 +22,7 @@ class CameraBot(ClientXMPP):
             main={"size": (320, 240), "format": "XBGR8888"},
             buffer_count=2
         ))
-        self.picam2.start(show_preview=False)
+        self.picam2.start()  # Pas de show_preview ici !
 
         self.add_event_handler("session_start", self.start)
 
@@ -56,7 +60,3 @@ def start_camera_thread():
 
     t = Thread(target=worker, daemon=True)
     t.start()
-
-if __name__ == "__main__":
-    start_camera_thread()
-    asyncio.get_event_loop().run_forever()
