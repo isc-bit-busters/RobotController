@@ -2,11 +2,10 @@ FROM dtcooper/raspberrypi-os:python3.9
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Prioriser les paquets Raspberry Pi
+# Prioritize Raspberry Pi packages
 RUN echo 'Package: *\nPin: origin "archive.raspberrypi.org"\nPin-Priority: 1001' > /etc/apt/preferences.d/raspi.pref
-# Dépendances système
+
+# System dependencies
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-smbus \
@@ -33,31 +32,32 @@ RUN apt-get update && apt-get install -y \
     meson \
     ninja-build \
     python3-pybind11 \
-    python3-jinja2 \
-    python3-yaml \
-    python3-ply \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer libcamera depuis la source
+# Install Python dependencies needed for libcamera build
+RUN pip3 install --no-cache-dir Jinja2 PyYAML ply
 
-# Corriger le lien pour Python (libcamera bindings)
+# Set up Python path
 ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
 
-# Installer picamera2 via pip (qui utilise libcamera compilé)
-RUN pip3 install --no-cache-dir picamera2
-
-# Appli
-WORKDIR /app
-COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
-
+# Build and install libcamera
 WORKDIR /opt
 RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     cd libcamera && \
     meson setup build && \
-    ninja -C build install
+    ninja -C build -j2 install
 
+# Now install picamera2 after libcamera is built
+RUN pip3 install --no-cache-dir picamera2
+
+# App setup
+WORKDIR /app
+COPY requirements.txt .
+
+# Fix requirements.txt - make sure it uses pyyaml instead of yaml
+RUN sed -i 's/yaml/pyyaml/g' requirements.txt && \
+    pip3 install --no-cache-dir -r requirements.txt
 
 COPY agent/ ./agent/
 
