@@ -3,6 +3,7 @@ from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour, PeriodicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
+from agent import camera_streamer
 import asyncio
 import os
 import time
@@ -123,6 +124,11 @@ async def main():
     logger.info(f"XMPP JID: {xmpp_jid}")
     logger.info(f"XMPP Password: {'*' * len(xmpp_password)}")
     
+    
+    # ✅ Démarrer le stream caméra dans un thread
+    camera_streamer.start_camera_thread()
+
+
     try:
         agent = AlphaBotAgent(
             jid=xmpp_jid, 
