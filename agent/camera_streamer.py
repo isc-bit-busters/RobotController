@@ -1,13 +1,17 @@
+# agent/camera_streamer.py
+
 import cv2
 import base64
+import json
 import time
 import redis
+from datetime import datetime
 from picamera2 import Picamera2
 
-# Connexion à Redis sur le PC
+# Connexion Redis (vers ton PC)
 r = redis.Redis(host="192.168.88.249", port=6379)
 
-# Initialiser la caméra
+# Initialisation Picamera2
 picam2 = Picamera2()
 picam2.configure(picam2.create_video_configuration(
     main={"size": (320, 240), "format": "XBGR8888"},
@@ -20,10 +24,18 @@ try:
         frame = picam2.capture_array("main")
         _, buffer = cv2.imencode('.jpg', frame)
         encoded = base64.b64encode(buffer).decode("utf-8")
+        timestamp = datetime.now().isoformat()
 
-        # Envoie l'image encodée dans une liste Redis (clé = "robot:frames")
-        r.lpush("robot:frames", encoded)
+        # Format JSON
+        payload = {
+            "timestamp": timestamp,
+            "image": encoded
+        }
+
+        # Envoi dans Redis (liste `robot:frames`)
+        r.lpush("robot:frames", json.dumps(payload))
 
         time.sleep(0.2)
+
 except KeyboardInterrupt:
     picam2.stop()
