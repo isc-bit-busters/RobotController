@@ -1,68 +1,29 @@
-# =========================
-# 📦 Fichier : agent/camera_streamer.py
-# =========================
-
 import cv2
 import base64
-import asyncio
-import os
-from threading import Thread
-from slixmpp import ClientXMPP
+import time
+import redis
+from picamera2 import Picamera2
 
-# PATCH IMPORT PICAMERA2 sans PREVIEWS
-import importlib.util
-spec = importlib.util.find_spec("picamera2.picamera2")
-picam2_module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(picam2_module)
-Picamera2 = picam2_module.Picamera2
+# Connexion à Redis sur le PC
+r = redis.Redis(host="192.168.88.249", port=6379)
 
-class CameraBot(ClientXMPP):
-    def __init__(self, jid, password, recipient, robot_id, camera_index=0):
-        super().__init__(jid, password)
-        self.recipient = recipient
-        self.robot_id = robot_id
-        self.running = True
+# Initialiser la caméra
+picam2 = Picamera2()
+picam2.configure(picam2.create_video_configuration(
+    main={"size": (320, 240), "format": "XBGR8888"},
+    buffer_count=2
+))
+picam2.start()
 
-        self.picam2 = Picamera2(camera_num=camera_index)
-        self.picam2.configure(self.picam2.create_video_configuration(
-            main={"size": (320, 240), "format": "XBGR8888"},
-            buffer_count=2
-        ))
-        self.picam2.start()
+try:
+    while True:
+        frame = picam2.capture_array("main")
+        _, buffer = cv2.imencode('.jpg', frame)
+        encoded = base64.b64encode(buffer).decode("utf-8")
 
-        self.add_event_handler("session_start", self.start)
+        # Envoie l'image encodée dans une liste Redis (clé = "robot:frames")
+        r.lpush("robot:frames", encoded)
 
-    async def send_frame(self):
-        while self.running:
-            frame = self.picam2.capture_array("main")
-            _, buffer = cv2.imencode('.jpg', frame)
-            img_base64 = base64.b64encode(buffer).decode()
-            msg = self.make_message(mto=self.recipient, mbody=img_base64, mtype='chat')
-            msg['subject'] = self.robot_id
-            msg.send()
-            await asyncio.sleep(0.2)
-
-    async def start(self, event):
-        self.send_presence()
-        await self.get_roster()
-        await self.send_frame()
-
-    def stop(self):
-        self.running = False
-        self.picam2.stop()
-        self.disconnect()
-
-def start_camera_thread():
-    def worker():
-        robot_id = os.environ.get("ROBOT_ID", "robot1")
-        bot = CameraBot(
-            jid=f"{robot_id}@prosody",
-            password=os.environ.get("XMPP_PASSWORD", "robotpassword"),
-            recipient="dashboard@prosody",
-            robot_id=robot_id
-        )
-        bot.connect()
-        bot.process()
-
-    t = Thread(target=worker, daemon=True)
-    t.start()
+        time.sleep(0.2)
+except KeyboardInterrupt:
+    picam2.stop()
