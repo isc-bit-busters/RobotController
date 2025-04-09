@@ -5,5 +5,5 @@ spade==3.3.3
 aiofiles
 opencv-python==4.11.0.86
 picamera2
+opencv-python
 slixmpp
-rpi-libcamera
