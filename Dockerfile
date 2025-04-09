@@ -29,18 +29,19 @@ RUN apt-get update && apt-get install -y \
     meson \
     ninja-build \
     python3-pybind11 \
-    python3-jinja2 \
-    python3-yaml \
-    python3-ply \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer libcamera depuis la source
+# Installer les modules Python nécessaires à la compilation
+RUN pip3 install jinja2 PyYAML ply
+
+# Compiler libcamera depuis les sources
 WORKDIR /opt
 RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     cd libcamera && \
     meson setup build && \
     ninja -C build install
+
 
 # Corriger le lien pour Python (libcamera bindings)
 ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
