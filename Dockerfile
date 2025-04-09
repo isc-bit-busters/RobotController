@@ -1,11 +1,12 @@
-FROM dtcooper/raspberrypi-os:python3.9
+FROM raspbian/python:3.9
 
-# Installer dépendances système
-RUN apt update && apt install -y \
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Installer les dépendances système
+RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-smbus \
     python3-serial \
-    ttf-wqy-zenhei \
     build-essential \
     python3-dev \
     libgl1-mesa-glx \
@@ -24,17 +25,25 @@ RUN apt update && apt install -y \
     libx264-dev \
     libfontconfig1-dev \
     libfreetype6-dev \
+    libcamera0 \
     libcamera-dev \
-    libcamera-apps \
-    python3-picamera2 \
     python3-libcamera \
+    python3-picamera2 \
+    libcamera-apps \
+    ffmpeg \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Copier requirements.txt
+# Définir le répertoire de travail
+WORKDIR /app
+
+# Copier les dépendances Python
 COPY requirements.txt .
 
-# Installer dépendances Python
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Lancer le programme principal
-CMD ["python", "-m", "agent"]
+# Copier ton code
+COPY agent/ ./agent/
+
+# Lancer le programme
+CMD ["python3", "-m", "agent.camera_streamer"]

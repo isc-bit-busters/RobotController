@@ -8,6 +8,8 @@ import asyncio
 from threading import Thread
 from picamera2 import Picamera2
 from slixmpp import ClientXMPP
+import logging
+logging.basicConfig(level=logging.INFO)
 
 class CameraBot(ClientXMPP):
     def __init__(self, jid, password, recipient, robot_id, camera_index=0):
@@ -27,12 +29,15 @@ class CameraBot(ClientXMPP):
 
     async def send_frame(self):
         while self.running:
-            frame = self.picam2.capture_array("main")
-            _, buffer = cv2.imencode('.jpg', frame)
-            img_base64 = base64.b64encode(buffer).decode()
-            msg = self.make_message(mto=self.recipient, mbody=img_base64, mtype='chat')
-            msg['subject'] = self.robot_id
-            msg.send()
+            try:
+                frame = self.picam2.capture_array("main")
+                _, buffer = cv2.imencode('.jpg', frame)
+                img_base64 = base64.b64encode(buffer).decode()
+                msg = self.make_message(mto=self.recipient, mbody=img_base64, mtype='chat')
+                msg['subject'] = self.robot_id
+                msg.send()
+            except Exception as e:
+                logging.error(f"Error sending frame: {e}")
             await asyncio.sleep(0.2)
 
     async def start(self, event):
