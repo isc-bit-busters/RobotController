@@ -39,12 +39,14 @@ RUN pip3 install jinja2 PyYAML ply
 WORKDIR /opt
 RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     cd libcamera && \
-    meson setup build && \
+    meson setup build -Dpycamera=enabled && \
     ninja -C build install
 
+# Ajouter le dossier site-packages au PYTHONPATH
+ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:$PYTHONPATH"
 
-# Corriger le lien pour Python (libcamera bindings)
-ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
+# Tester l'import Python
+RUN python3 -c "import libcamera; print('✅ libcamera Python binding OK')"
 
 # Installer picamera2 via pip (qui utilise libcamera compilé)
 RUN pip3 install --no-cache-dir picamera2
