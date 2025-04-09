@@ -72,18 +72,18 @@ class AlphaBot2(object):
 
 
 	def advance(self, dist=1.0):
-		self.setPWMA(7.8*dist)
-		self.setPWMB(7*dist)
+		self.setPWMA(7.8)
+		self.setPWMB(7.3)
 		self.forward()
-		time.sleep(2.8)
-	
+		time.sleep(12 * dist)
+
 
 	def turn(self, deg):
 		if deg > 0:
 			self.left()
 		else:
 			self.right()
-		time.sleep(abs(deg)/450.0)
+		time.sleep(abs(deg)/640.0)
 		self.stop()
 
 
@@ -97,10 +97,14 @@ class AlphaBot2(object):
 
 		self.turn(rot_angle)
 
+		time.sleep(0.3)
+
 		dist = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 		if dist > 0:
 			self.advance(dist)
 		self.stop()
+
+		time.sleep(0.3)
 
 		return angle
 
@@ -147,8 +151,11 @@ if __name__=='__main__':
 	]
 
 	for i in range(len(waypoints) - 1):
-		angle = Ab.goto(waypoints[i][0], waypoints[i][1], waypoints[i + 1][0], waypoints[i + 1][1], angle)
+		angle = Ab.goto(waypoints[i][0]*0.2, waypoints[i][1]*0.2, waypoints[i + 1][0]*0.2, waypoints[i + 1][1]*0.2, angle)
 		time.sleep(0.33)
+
+	# Ab.turn(90)
+	
 
 	Ab.stop()
 
