@@ -1,4 +1,4 @@
-FROM raspbian/python:3.9
+FROM dtcooper/raspberrypi-os:python3.9
 
 ENV DEBIAN_FRONTEND=noninteractive
 
