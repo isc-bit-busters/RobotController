@@ -116,7 +116,7 @@ class AlphaBotAgent(Agent):
 
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
-    xmpp_username = os.environ.get("XMPP_USERNAME", "alpha-pi-zero-agent")
+    xmpp_username = os.environ.get("XMPP_USERNAME", "gerald")
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
     
