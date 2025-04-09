@@ -1,9 +1,8 @@
 FROM dtcooper/raspberrypi-os:python3.9
 
-
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages"
 
-# Dépendances système
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-serial \
@@ -32,26 +31,18 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer les modules Python nécessaires à la compilation
 RUN pip3 install jinja2 PyYAML ply
 
-# Compiler libcamera depuis les sources
 WORKDIR /opt
 RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     cd libcamera && \
     meson setup build -Dpycamera=enabled && \
-    ninja -C build install
+    ninja -v -C build install
 
-# Ajouter le dossier site-packages au PYTHONPATH
-ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:$PYTHONPATH"
-
-# Tester l'import Python
 RUN python3 -c "import libcamera; print('✅ libcamera Python binding OK')"
 
-# Installer picamera2 via pip (qui utilise libcamera compilé)
 RUN pip3 install --no-cache-dir picamera2
 
-# Appli
 WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
