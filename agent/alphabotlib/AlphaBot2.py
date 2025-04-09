@@ -1,5 +1,6 @@
 import RPi.GPIO as GPIO
 import time
+import math
 
 class AlphaBot2(object):
 	def __init__(self,ain1=12,ain2=13,ena=6,bin1=20,bin2=21,enb=26):
@@ -68,15 +69,52 @@ class AlphaBot2(object):
 		GPIO.output(self.AIN2,GPIO.HIGH)
 		GPIO.output(self.BIN1,GPIO.HIGH)
 		GPIO.output(self.BIN2,GPIO.LOW)
-		
+
+
+	def advance(self, dist=1.0):
+		self.setPWMA(7.8*dist)
+		self.setPWMB(7*dist)
+		self.forward()
+		time.sleep(2.8)
+	
+
+	def turn(self, deg):
+		if deg > 0:
+			self.left()
+		else:
+			self.right()
+		time.sleep(abs(deg)/450.0)
+		self.stop()
+
+
+	def goto(self, x1, y1, x2, y2, curr_angle):
+		angle = math.atan2(y2 - y1, x2 - x1) * 180 / math.pi
+		rot_angle = angle - curr_angle
+		if rot_angle > 180:
+			rot_angle -= 360
+		elif rot_angle < -180:
+			rot_angle += 360
+
+		self.turn(rot_angle)
+
+		dist = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+		if dist > 0:
+			self.advance(dist)
+		self.stop()
+
+		return angle
+
+
 	def setPWMA(self,value):
 		self.PA = value
 		self.PWMA.ChangeDutyCycle(self.PA)
+
 
 	def setPWMB(self,value):
 		self.PB = value
 		self.PWMB.ChangeDutyCycle(self.PB)	
 		
+
 	def setMotor(self, left, right):
 		if((right >= 0) and (right <= 100)):
 			GPIO.output(self.AIN1,GPIO.HIGH)
@@ -96,9 +134,24 @@ class AlphaBot2(object):
 			self.PWMB.ChangeDutyCycle(0 - left)
 
 if __name__=='__main__':
-
 	Ab = AlphaBot2()
-	Ab.forward()
+
+	angle = 0
+	waypoints = [
+		(0, 0),
+		(1, 0),
+		(1, -1),
+		(1, -2), 
+		(2, -2),
+		(2, -1),
+	]
+
+	for i in range(len(waypoints) - 1):
+		angle = Ab.goto(waypoints[i][0], waypoints[i][1], waypoints[i + 1][0], waypoints[i + 1][1], angle)
+		time.sleep(0.33)
+
+	Ab.stop()
+
 	try:
 		while True:
 			time.sleep(1)
