@@ -5,7 +5,6 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Dépendances système
 RUN apt-get update && apt-get install -y \
     python3-pip \
-    python3-smbus \
     python3-serial \
     build-essential \
     python3-dev \
