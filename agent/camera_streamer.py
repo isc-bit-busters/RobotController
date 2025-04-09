@@ -17,8 +17,11 @@ class CameraBot(ClientXMPP):
         self.running = True
 
         self.picam2 = Picamera2(camera_num=camera_index)
-        self.picam2.configure(self.picam2.create_video_configuration(main={"size": (320, 240)}))
-        self.picam2.start()
+        self.picam2.configure(self.picam2.create_video_configuration(
+            main={"size": (320, 240), "format": "XBGR8888"},
+            buffer_count=2
+        ))
+        self.picam2.start(show_preview=False)
 
         self.add_event_handler("session_start", self.start)
 
