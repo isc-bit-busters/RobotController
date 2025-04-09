@@ -40,11 +40,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer libcamera depuis la source
-WORKDIR /opt
-RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
-    cd libcamera && \
-    meson setup build && \
-    ninja -C build install
 
 # Corriger le lien pour Python (libcamera bindings)
 ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
@@ -56,6 +51,14 @@ RUN pip3 install --no-cache-dir picamera2
 WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+WORKDIR /opt
+RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
+    cd libcamera && \
+    meson setup build && \
+    ninja -C build install
+
+
 COPY agent/ ./agent/
 
 CMD ["python3", "-m", "agent.camera_streamer"]
