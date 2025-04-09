@@ -39,6 +39,11 @@ RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     meson setup build -Dpycamera=enabled && \
     ninja -C build install
 
+# Copier les bindings compilés de libcamera dans site-packages
+RUN cp /opt/libcamera/build/src/py/libcamera/_libcamera.so /usr/local/lib/python3.9/site-packages/ && \
+    echo "from _libcamera import *" > /usr/local/lib/python3.9/site-packages/libcamera.py
+
+
 RUN pip3 install --no-cache-dir picamera2
 
 WORKDIR /app
