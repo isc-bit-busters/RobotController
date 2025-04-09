@@ -15,6 +15,7 @@ RUN apt update && apt install -y \
     libglib2.0-0 \
     libcap-dev \
     && rm -rf /var/lib/apt/lists/*
+    python3-picamera2 --no-install-recommends
 
 COPY requirements.txt .
 

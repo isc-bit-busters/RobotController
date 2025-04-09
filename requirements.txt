@@ -6,3 +6,4 @@ aiofiles
 opencv-python==4.11.0.86
 picamera2
 slixmpp
+rpi-libcamera
