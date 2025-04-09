@@ -2,7 +2,12 @@ FROM dtcooper/raspberrypi-os:python3.9
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Installer les dépendances système
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Prioriser les paquets Raspberry Pi
+RUN echo 'Package: *\nPin: origin "archive.raspberrypi.org"\nPin-Priority: 1001' > /etc/apt/preferences.d/raspi.pref
+
+# Mettez à jour et installez les dépendances nécessaires
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-smbus \
@@ -25,25 +30,22 @@ RUN apt-get update && apt-get install -y \
     libx264-dev \
     libfontconfig1-dev \
     libfreetype6-dev \
-    libcamera0 \
+    ffmpeg \
     libcamera-dev \
+    libcamera-apps \
     python3-libcamera \
     python3-picamera2 \
-    libcamera-apps \
-    ffmpeg \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Définir le répertoire de travail
 WORKDIR /app
 
-# Copier les dépendances Python
+# Copier les fichiers Python
 COPY requirements.txt .
 
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copier ton code
 COPY agent/ ./agent/
 
-# Lancer le programme
 CMD ["python3", "-m", "agent.camera_streamer"]
