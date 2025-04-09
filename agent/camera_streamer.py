@@ -7,7 +7,7 @@ import base64
 import asyncio
 import os
 from threading import Thread
-from picamera2 import Picamera2
+from picamera2 import Picamera2  # Pas de Preview
 from slixmpp import ClientXMPP
 
 class CameraBot(ClientXMPP):
@@ -22,7 +22,7 @@ class CameraBot(ClientXMPP):
             main={"size": (320, 240), "format": "XBGR8888"},
             buffer_count=2
         ))
-        self.picam2.start()  # Pas de show_preview ici !
+        self.picam2.start()  # show_preview=False est implicite si on n'utilise pas les previews
 
         self.add_event_handler("session_start", self.start)
 
