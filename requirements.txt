@@ -6,3 +6,7 @@ aiofiles
 opencv-python==4.11.0.86
 picamera2
 slixmpp
+jinja2
+yaml
+jinja2
+ply
