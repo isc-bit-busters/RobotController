@@ -51,4 +51,7 @@ COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 COPY agent/ ./agent/
 
+ENV LD_LIBRARY_PATH="/usr/local/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
+
+
 CMD ["python3", "-m", "agent.camera_streamer"]
