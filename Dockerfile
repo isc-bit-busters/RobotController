@@ -1,12 +1,10 @@
-FROM dtcooper/raspberrypi-os:python3.9
+FROM raspbian/python:3.9
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Prioritize Raspberry Pi packages
-RUN echo 'Package: *\nPin: origin "archive.raspberrypi.org"\nPin-Priority: 1001' > /etc/apt/preferences.d/raspi.pref
-
-# System dependencies - avoid python3-pip which can cause conflicts
+# Dépendances système
 RUN apt-get update && apt-get install -y \
+    python3-pip \
     python3-smbus \
     python3-serial \
     build-essential \
@@ -30,7 +28,6 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     meson \
     ninja-build \
-    python3-venv \
     python3-pybind11 \
     python3-jinja2 \
     python3-yaml \
@@ -38,31 +35,23 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create and activate a virtual environment to avoid Python module conflicts
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-ENV VIRTUAL_ENV="/opt/venv"
-
-# Install pip inside the virtual environment
-RUN python -m pip install --upgrade pip
-
-# Build and install libcamera
+# Installer libcamera depuis la source
 WORKDIR /opt
-RUN git clone https://github.com/raspberrypi/libcamera.git && \
+RUN git clone https://git.libcamera.org/libcamera/libcamera.git && \
     cd libcamera && \
     meson setup build && \
-    ninja -C build -j2 install
+    ninja -C build install
 
-# Make sure Python can find the libraries
-ENV LD_LIBRARY_PATH="/usr/local/lib"
-ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/opt/venv/lib/python3.9/site-packages"
+# Corriger le lien pour Python (libcamera bindings)
+ENV PYTHONPATH="/usr/local/lib/python3.9/site-packages:/usr/local/lib/python3.9/dist-packages:/usr/local/lib/python3.9"
 
-# Now install picamera2 and other requirements
-RUN pip install --no-cache-dir picamera2 RPi.GPIO spidev rpi_ws281x spade==3.3.3 aiofiles \
-    opencv-python==4.11.0.86 slixmpp pyyaml jinja2 ply
+# Installer picamera2 via pip (qui utilise libcamera compilé)
+RUN pip3 install --no-cache-dir picamera2
 
-# App setup
+# Appli
 WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
 COPY agent/ ./agent/
 
-CMD ["python", "-m", "agent.camera_streamer"]
+CMD ["python3", "-m", "agent.camera_streamer"]
