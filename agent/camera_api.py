@@ -28,5 +28,16 @@ def stream_frame():
         return Response(jpeg.tobytes(), mimetype='image/jpeg')
     return Response(status=503)
 
+@app.route('/video_feed')
+def video_feed():
+    def generate():
+        while True:
+            frame = picam2.capture_array()
+            _, jpeg = cv2.imencode('.jpg', frame)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, threaded=True)
