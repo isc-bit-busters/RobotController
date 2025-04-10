@@ -20,19 +20,12 @@ def update_frame():
 
 threading.Thread(target=update_frame, daemon=True).start()
 
-@app.route('/frame')
-def stream_frame():
-    global frame
-    if frame is not None:
-        _, jpeg = cv2.imencode('.jpg', frame)
-        return Response(jpeg.tobytes(), mimetype='image/jpeg')
-    return Response(status=503)
-
 @app.route('/video_feed')
 def video_feed():
     def generate():
         while True:
             frame = picam2.capture_array()
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             _, jpeg = cv2.imencode('.jpg', frame)
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
