@@ -111,6 +111,30 @@ The agent uses environment variables for configuration:
 - `XMPP_USERNAME` - XMPP username for the agent
 - `XMPP_PASSWORD` - XMPP password for the agent
 
+## Adding API runner 
+sudo nano /etc/systemd/system/camera-api.service
+
+[Unit]
+Description=Camera Flask API
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/test/RobotController/agent/camera_api.py
+WorkingDirectory=/home/test/RobotController/agent
+Restart=always
+User=test
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo systemctl daemon-reexec        # Réinitialise systemd (utile après update)
+sudo systemctl daemon-reload        # Recharge les services
+sudo systemctl enable camera-api    # Démarrage auto au boot
+sudo systemctl start camera-api     # Lance maintenant
+
+
 ## License
 
 [Add your license information here]
