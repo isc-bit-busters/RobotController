@@ -1,0 +1,23 @@
+sudo nano /etc/systemd/system/camera-api.service
+
+[Unit]
+Description=Camera API Flask Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/pi/camera_api.py
+WorkingDirectory=/home/pi
+Restart=always
+User=pi
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+
+sudo systemctl daemon-reexec        # Réinitialise systemd (utile après update)
+sudo systemctl daemon-reload        # Recharge les services
+sudo systemctl enable camera-api    # Démarrage auto au boot
+sudo systemctl start camera-api     # Lance maintenant
+
+
