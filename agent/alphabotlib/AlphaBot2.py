@@ -72,10 +72,27 @@ class AlphaBot2(object):
 
 
 	def advance(self, dist=1.0):
-		self.setPWMA(7.8)
-		self.setPWMB(7.3)
-		self.forward()
-		time.sleep(12 * dist)
+		DR = 16
+		DL = 19
+
+		GPIO.setmode(GPIO.BCM)
+		GPIO.setwarnings(False)
+		GPIO.setup(DR,GPIO.IN,GPIO.PUD_UP)
+		GPIO.setup(DL,GPIO.IN,GPIO.PUD_UP)
+
+		for i in range(int(dist*10)):
+			DR_status = GPIO.input(DR)
+			DL_status = GPIO.input(DL)
+			if(DL_status == 0):
+				Ab.turn(90)
+			elif(DR_status == 0):
+				Ab.turn(-90)
+			else:
+				self.setPWMA(7.8)
+				self.setPWMB(7.3)
+				self.forward()
+				time.sleep(12 * 0.1)
+
 
 
 	def turn(self, deg):
@@ -137,27 +154,48 @@ class AlphaBot2(object):
 			GPIO.output(self.BIN2,GPIO.HIGH)
 			self.PWMB.ChangeDutyCycle(0 - left)
 
+
 if __name__=='__main__':
 	Ab = AlphaBot2()
-
 	angle = 0
 	waypoints = [
 		(0, 0),
-		(1, 0),
-		(1, -1),
-		(1, -2), 
-		(2, -2),
-		(2, -1),
+		(2, 0),
+		#(1, -1),
+		# (1, -2), 
+		# (2, -2),
+		# (2, -1),
 	]
 
+	coordinates1 = (361, 79)
+	coordinates2 = (363, 253)
+
+	# Calculate the scaling factor and offset
+	x_scale = coordinates2[0] - coordinates1[0]
+	y_scale = coordinates2[1] - coordinates1[1]
+
+	x_offset = coordinates1[0]
+	y_offset = coordinates1[1]
+
+
+	def waypoint_to_pixel(waypoint):
+		x_pixel = x_offset + waypoint[0] * x_scale
+		y_pixel = y_offset + waypoint[1] * y_scale
+		return (x_pixel, y_pixel)
+
+	# map coordinates1 and coordinates2 to waypoints (0,0) and (1,0)
+
+
 	for i in range(len(waypoints) - 1):
+		pixel_waypoint1 = waypoint_to_pixel(waypoints[i])
+		pixel_waypoint2 = waypoint_to_pixel(waypoints[i+1])
 		angle = Ab.goto(waypoints[i][0]*0.2, waypoints[i][1]*0.2, waypoints[i + 1][0]*0.2, waypoints[i + 1][1]*0.2, angle)
-		time.sleep(0.33)
+		#time.sleep(0.33)
 
 	# Ab.turn(90)
-	
 
-	Ab.stop()
+
+	#Ab.stop()
 
 	try:
 		while True:

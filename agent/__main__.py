@@ -1,6 +1,7 @@
+import base64
 from agent.alphabotlib.Camera import get_picture_base64
 from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour, PeriodicBehaviour
+from spade.behaviour import CyclicBehaviour, PeriodicBehaviour, OneShotBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
 import asyncio
@@ -20,98 +21,60 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
     log.propagate = True
 
 class AlphaBotAgent(Agent):
-    class XMPPCommandListener(CyclicBehaviour):
-        async def on_start(self):
-            logger.info("[Behavior] Initializing AlphaBot2...")
-            self.ab = AlphaBot2()
-            logger.info("[Behavior] Ready to receive commands.")
-            
+    class RegisterToCameraAgentBehaviour(OneShotBehaviour):
         async def run(self):
-            logger.debug("[Behavior] Waiting for messages...")
-            msg = await self.receive(timeout=10)
-            if msg:
-                logger.info(f"[Behavior] Received command ({msg.sender}): {msg.body}")
-                await self.process_command(msg)
-                
-                # Send a confirmation response
-                reply = Message(to=str(msg.sender))
-                reply.set_metadata("performative", "inform")
-                reply.body = f"Executed command: {msg.body}"
-                await self.send(reply)
-                logger.info(f"[Behavior] Sent reply to {msg.sender}")
+            msg = Message(to="camera_agent@prosody") 
+            msg.body = "register"
+            
+            logger.info("[Behavior] Registering to camera agent...")
+            await self.send(msg)
+            logger.info("[Behavior] Registration message sent.")
+
+    class UnregisterFromCameraAgentBehaviour(OneShotBehaviour):
+        async def run(self):
+            msg = Message(to="camera_agent@prosody") 
+            msg.body = "unregister"
+            
+            logger.info("[Behavior] Unregistering from camera agent...")
+            await self.send(msg)
+            logger.info("[Behavior] Unregistration message sent.")
+
+    class ListenForImageBehaviour(CyclicBehaviour):
+        async def run(self):
+            msg = await self.receive(timeout=15)
+            if msg and msg.body.startswith("image "):
+                logger.info(f"[Behavior] Received image message from {msg.sender}")
+                time_ms = asyncio.get_event_loop().time() * 1000
+                logger.info(f"[Behavior] Message received at {time_ms} ms")
+
+                encoded_img = msg.body.split("image ")[1].strip()
+
+                logger.info("[Behavior] Decoding image..." )
+                decoded_img = base64.b64decode(encoded_img)
+                logger.info("[Behavior] Image decoded.")
             else:
                 logger.debug("[Behavior] No message received during timeout.")
-        
-        async def process_command(self, message):
-            command = message.body.strip().lower()
-            thread = message.thread
-            sender = str(message.sender)
-
-            if command == "forward":
-                logger.info("[Behavior] Moving forward...")
-                self.ab.forward()
-                await asyncio.sleep(2)
-                self.ab.stop()
-                
-            elif command == "backward":
-                logger.info("[Behavior] Moving backward...")
-                self.ab.backward()
-                await asyncio.sleep(2)
-                self.ab.stop()
-                
-            elif command == "left":
-                logger.info("[Behavior] Turning left...")
-                self.ab.left()
-                await asyncio.sleep(2)
-                self.ab.stop()
-                
-            elif command == "right":
-                logger.info("[Behavior] Turning right...")
-                self.ab.right()
-                await asyncio.sleep(2)
-                self.ab.stop()
-                
-            elif command.startswith("motor "):
-                try:
-                    _, left, right = command.split()
-                    left_speed = int(left)
-                    right_speed = int(right)
-                    logger.info(f"[Behavior] Setting motor speeds to {left_speed} (left) and {right_speed} (right)...")
-                    self.ab.setMotor(left_speed, right_speed)
-                    await asyncio.sleep(2)
-                    self.ab.stop()
-                except (ValueError, IndexError):
-                    logger.error("[Behavior] Invalid motor command format. Use 'motor <left_speed> <right_speed>'")
-
-            elif command == "takepic":
-                logger.info("[Behavior] Taking picture...")
-                encoded_img = await get_picture_base64()
-
-                msg = Message(to=sender)
-                msg.body = encoded_img
-                msg.thread = thread
-
-                await self.send(msg)
-                print("Picture sent.")
-
-                pass
-                    
-            elif command == "stop":
-                logger.info("[Behavior] Stopping...")
-                self.ab.stop()
-                
-            else:
-                logger.warning(f"[Behavior] Unknown command: {command}")
 
     async def setup(self):
-        logger.info("[Agent] AlphaBotAgent starting setup...")
+        logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
         # Add command listener behavior
-        command_behavior = self.XMPPCommandListener()
-        self.add_behaviour(command_behavior)
+        register_behavior = self.RegisterToCameraAgentBehaviour()
+        self.add_behaviour(register_behavior)
+
+        listen_for_image_behavior = self.ListenForImageBehaviour()
+        self.add_behaviour(listen_for_image_behavior)
         
         logger.info("[Agent] Behaviors added, setup complete.")
+
+    async def stop(self):
+        logger.info("[Agent] Stopping AlphaBotAgent " + self.jid)
+        unregister_behavior = self.UnregisterFromCameraAgentBehaviour()
+        self.add_behaviour(unregister_behavior)
+        
+        await super().stop()
+        logger.info("[Agent] AlphaBotAgent stopped.")
 
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
