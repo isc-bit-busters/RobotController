@@ -1,6 +1,7 @@
 import base64
+import math
 from spade.agent import Agent
-from spade.behaviour import TimeoutBehaviour
+from spade.behaviour import TimeoutBehaviour, OneShotBehaviour
 from spade.message import Message
 from spade.template import Template
 import asyncio
@@ -19,9 +20,14 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
     log.setLevel(logging.DEBUG)
     log.propagate = True
 
-IMAGE_FREQUENCY = 0.5 # seconds
+IMAGE_INTERVAL_MS = 500 
+IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
 
 class AlphaBotAgent(Agent):
+    def __init__(self, jid, password, verify_security=True, name=None):
+        super().__init__(jid=jid, password=password, verify_security=verify_security)
+        self.robot_name = name
+
     class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
             thread_id = uuid.uuid4()
@@ -48,34 +54,74 @@ class AlphaBotAgent(Agent):
                 logger.info("[Behavior] Image decoded.")
 
                 now = asyncio.get_event_loop().time() * 1000
-                request_image_behavior = self.RequestImageBehaviour(start_at=now + IMAGE_FREQUENCY * 1000)
+                request_image_behavior = self.RequestImageBehaviour(start_at=now + IMAGE_INTERVAL_MS)
                 self.agent.add_behaviour(request_image_behavior)
             else:
                 logger.debug("[Behavior] No message received during timeout.")
+
+    class PingBehaviour(OneShotBehaviour):
+        def __init__(self, to, **kwargs):
+            super().__init__(**kwargs)
+            self.to = to # waf
+
+        async def run(self):
+            msg = Message(to=self.to) 
+            msg.body = "ping"
+            logger.info("[Behavior] Sending ping to camera agent...")
+            await self.send(msg)
+
+            reply = await self.receive(timeout=30)
+            if reply:
+                logger.info(f"[Behavior] Received ping reply from {msg.sender}")
+            else:
+                logger.debug("[Behavior] No ping reply received during timeout.")
+
+    class PongBehaviour(OneShotBehaviour):
+        async def run(self):
+            while True:
+                msg = await self.receive(timeout=30)
+                if msg:
+                    if msg.body != "ping":
+                        continue
+
+                    logger.info(f"[Behavior] Received ping from {msg.sender}")
+                    reply = Message(to=str(msg.sender))
+                    reply.body = "pong"
+                    logger.info("[Behavior] Sending pong reply...")
+                    await self.send(reply)
+                else:
+                    logger.debug("[Behavior] No ping message received during timeout.")
 
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
-        # Add command listener behavior
+        # gerald requests images on x.0 and x.5 sec, mael on x.25 and x.75 sec 
         now = asyncio.get_event_loop().time() * 1000
-        request_image_behavior = self.RequestImageBehaviour(start_at=now)
+        staggered_start_time = math.ceil(now / IMAGE_INTERVAL_MS) * IMAGE_INTERVAL_MS 
+        staggered_start_time += IMAGE_OFFSET_MS if self.robot_name == "mael" else 0
+
+        request_image_behavior = self.RequestImageBehaviour(start_at=staggered_start_time)
         self.add_behaviour(request_image_behavior)
+    
+        other = "mael" if self.robot_name == "gerald" else "gerald"
+        ping_behavior = self.PingBehaviour(to=f"{other}@prosody")
+        self.add_behaviour(ping_behavior)
+        
+        pong_behavior = self.PongBehaviour()
+        self.add_behaviour(pong_behavior)
         
         logger.info("[Agent] Behaviors added, setup complete.")
 
-    async def stop(self):
-        logger.info("[Agent] Stopping AlphaBotAgent " + self.jid)
-        unregister_behavior = self.UnregisterFromCameraAgentBehaviour()
-        self.add_behaviour(unregister_behavior)
-        
-        await super().stop()
-        logger.info("[Agent] AlphaBotAgent stopped.")
 
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
-    xmpp_username = os.environ.get("XMPP_USERNAME", "alpha-pi-zero-agent")
+    xmpp_username = os.environ.get("XMPP_USERNAME")
+    if not xmpp_username:
+        logger.error("XMPP_USERNAME environment variable is not set.")
+        return        
+
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
     
@@ -87,7 +133,8 @@ async def main():
         agent = AlphaBotAgent(
             jid=xmpp_jid, 
             password=xmpp_password,
-            verify_security=False
+            verify_security=False,
+            name = xmpp_username
         )
         
         logger.info("Agent created, attempting to start...")
