@@ -144,6 +144,9 @@ def get_walls(img):
             polygons.append([x1, y1, x2, y2])
 
             cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+    cv2.imwrite("detected_lines.jpg", img)
+
     unique_polygons = []
     for p in polygons:
         if not any(abs(p[0] - up[0]) < 100 and abs(p[1] - up[1]) < 100 and abs(p[2] - up[2]) < 150 and abs(p[3] - up[3]) < 150 for up in unique_polygons):
@@ -165,6 +168,8 @@ def get_walls(img):
         cv2.circle(output_img, (p[0], p[1]), 5, (255, 0, 0), -1)
         cv2.circle(output_img, (p[2], p[3]), 5, (0, 255, 0), -1)
         
-    # np.array(unique_polygons).tofile("polygons.txt")
+    np.array(unique_polygons).tofile("polygons.txt")
+    output_path = "walls.jpg"
+    cv2.imwrite(output_path, output_img)
 
     return unique_polygons

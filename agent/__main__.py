@@ -18,7 +18,8 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco
+from agent.alphabotlib.test import detectAruco, get_walls
+from agent.nav_utils import generate_navmesh, find_path
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,6 +57,9 @@ class AlphaBotAgent(Agent):
     
     class ListenToImageBehaviour(CyclicBehaviour):
         async def run(self):
+            robot_id = 7
+            goal_id = 6
+
             logger.info("[Behavior] Listening for image messages...")
             msg = await self.receive(timeout=1)
             if msg and msg.body.startswith("image "):
@@ -76,6 +80,27 @@ class AlphaBotAgent(Agent):
                 logger.info("[Behavior] Decoding image..." )
                 decoded_img = base64.b64decode(encoded_img)
                 logger.info("[Behavior] Image decoded.")
+
+                img = cv2.imdecode(np.frombuffer(decoded_img, np.uint8), cv2.IMREAD_COLOR)
+                logger.info("[Behavior] Image decoded successfully.")
+
+                arucos = detectAruco(img)
+                print(f"Detected Arucos: {arucos}")
+                if robot_id not in arucos:
+                    logger.warning("[] Robot ID not found in image.")
+                pos1 = arucos[robot_id]
+                pos2 = arucos[goal_id]
+                
+                logger.info(f"[] going from {pos1} to {pos2}")
+
+                path = find_path((pos1["x"], 0, pos1["y"]), (pos2["x"], 0, pos2["y"]), *self.agent.navmesh)
+
+                if path is not None:
+                    logger.info(f"[Behavior] Path found: {path}")
+                else:
+                    logger.warning("[Behavior] No path found.")
+                    
+
             else:
                 logger.debug("[Behavior] Message received but not an image.")
 
@@ -112,30 +137,66 @@ class AlphaBotAgent(Agent):
                 else:
                     logger.debug("[Behavior] No ping message received during timeout.")
 
-    class MoveAndMeasureBehaviour(OneShotBehaviour):
+    class InitBehaviour(OneShotBehaviour):
         async def run(self):
             robot_id = 7
 
-            # === STEP 1: Take the first image ===
-            logger.info("[Step 1] Requesting initial image...")
+            logger.info("[Step 0] Requesting initial image...")
             msg = Message(to="camera_agent@prosody", body="request_image")
             await self.send(msg)
 
             reply = await self.receive(timeout=10)
             if not reply or not reply.body.startswith("image "):
-                logger.warning("[Step 1] No image received.")
+                logger.warning("[Step 0] No image received.")
                 return
 
             encoded_img = reply.body.split("image ")[1].strip()
             # print(encoded_img)
-            img1 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
-            arucos1 = detectAruco(img1)
-            print(f"Detected Arucos: {arucos1}")
-            if robot_id not in arucos1:
-                logger.warning("[Step 1] Robot ID not found in initial image.")
+            img0 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
 
-            pos1 = arucos1[robot_id]
-            logger.info(f"[Step 1] Robot initial position: {pos1}")
+            # === STEP 0: Generate NavMesh ===
+            logger.info("[Step 0] Generating NavMesh...")
+            walls = get_walls(img0)
+
+            logger.info(f"[Step 0] Detected walls: {walls}")
+                
+            vertices, polygons = generate_navmesh(walls)
+
+            logger.info(f"[Step 0] NavMesh vertices: {vertices}")
+            logger.info(f"[Step 0] NavMesh polygons: {polygons}")
+
+            self.agent.navmesh = (vertices, polygons)
+
+            detected_bot = False
+            while not detected_bot:
+                await asyncio.sleep(2)
+
+                # === STEP 1: Take the first image ===
+                logger.info("[Step 1] Requesting initial image...")
+                msg = Message(to="camera_agent@prosody", body="request_image")
+                await self.send(msg)
+
+                reply = await self.receive(timeout=10)
+                if not reply or not reply.body.startswith("image "):
+                    logger.warning("[Step 1] No image received.")
+                    return
+
+                encoded_img = reply.body.split("image ")[1].strip()
+                # print(encoded_img)
+                img1 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
+                arucos1 = detectAruco(img1)
+                print(f"Detected Arucos: {arucos1}")
+                if robot_id not in arucos1:
+                    logger.warning("[Step 1] Robot ID not found in initial image.")
+                    continue
+
+                pos1 = arucos1[robot_id]
+                logger.info(f"[Step 1] Robot initial position: {pos1}")
+
+                detected_bot = True
+            
+
+            await asyncio.sleep(2)
 
             t = 2  # seconds
             # === STEP 2: Move the robot ===
@@ -167,8 +228,11 @@ class AlphaBotAgent(Agent):
             )
             
             logger.info(f"[Step 4] Distance moved: {dist}")
-            speed = dist /t
+            speed = dist / t
+            self.agent.alphabot.setSpeed(speed)
             logger.info(f"[Step 4] Speed: {speed} units/s")
+
+            
 
         async def on_end(self):
             logger.info("[Behavior] MoveAndMeasureBehaviour ended.")
@@ -198,7 +262,7 @@ class AlphaBotAgent(Agent):
         
         logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
        
-        self.add_behaviour(self.MoveAndMeasureBehaviour())
+        self.add_behaviour(self.InitBehaviour())
         logger.info("[Agent] Behaviors added, setup complete.") 
 
 

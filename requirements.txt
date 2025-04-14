@@ -5,3 +5,4 @@ spade==3.3.3
 aiofiles
 opencv-python==4.11.0.86
 pynavmesh
+trimesh

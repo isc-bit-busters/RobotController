@@ -12,6 +12,7 @@ class AlphaBot2(object):
 		self.ENB = enb
 		self.PA  = 50
 		self.PB  = 50
+		self.speed = 1.0
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -71,11 +72,11 @@ class AlphaBot2(object):
 		GPIO.output(self.BIN2,GPIO.LOW)
 
 
-	def advance(self, dist=1.0):
+	def advance(self, duration=1.0):
 		DR = 16
 		DL = 19
 
-		print(f"Advance {dist}")
+		print(f"Advance {duration}")
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -97,9 +98,12 @@ class AlphaBot2(object):
 		self.setPWMA(7.8)
 		self.setPWMB(7.3)
 		self.forward()
-		time.sleep(dist)
+		time.sleep(duration)
 		self.stop()
 
+
+	def get_move_time(self, dist):
+		return dist / self.speed
 
 
 	def turn(self, deg):
@@ -143,7 +147,9 @@ class AlphaBot2(object):
 	def setPWMB(self,value):
 		self.PB = value
 		self.PWMB.ChangeDutyCycle(self.PB)	
-		
+
+	def setSpeed(self, speed):
+		self.speed = speed
 
 	def setMotor(self, left, right):
 		if((right >= 0) and (right <= 100)):
