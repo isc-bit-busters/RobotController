@@ -169,35 +169,38 @@ class AlphaBotAgent(Agent):
             logger.info(f"[Step 4] Distance moved: {dist}")
             speed = dist /t
             logger.info(f"[Step 4] Speed: {speed} units/s")
+
+        async def on_end(self):
+            logger.info("[Behavior] MoveAndMeasureBehaviour ended.")
+
+            # gerald requests images on x.0 and x.5 sec, mael on x.25 and x.75 sec 
+            now = datetime.datetime.now()
+            staggered_start_time = now + datetime.timedelta(milliseconds=IMAGE_OFFSET_MS if self.robot_name == "mael" else 0)
+
+            logger.info(f"[Agent] Staggered start time: {staggered_start_time}")
+
+            request_image_behavior = self.RequestImageBehaviour(start_at=staggered_start_time)
+            self.add_behaviour(request_image_behavior)
+
+            listen_to_image_behavior = self.ListenToImageBehaviour()
+            self.add_behaviour(listen_to_image_behavior)
+        
+            # ping_behavior = self.PingBehaviour(to=f"{self.other_agent}@prosody")
+            # self.add_behaviour(ping_behavior)
+            
+            # pong_behavior = self.PongBehaviour()
+            # self.add_behaviour(pong_behavior)
             
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
-        # gerald requests images on x.0 and x.5 sec, mael on x.25 and x.75 sec 
-        now = datetime.datetime.now()
-        staggered_start_time = now + datetime.timedelta(milliseconds=IMAGE_OFFSET_MS if self.robot_name == "mael" else 0)
-
-        logger.info(f"[Agent] Staggered start time: {staggered_start_time}")
-
-        request_image_behavior = self.RequestImageBehaviour(start_at=staggered_start_time)
-        self.add_behaviour(request_image_behavior)
-
-        listen_to_image_behavior = self.ListenToImageBehaviour()
-        self.add_behaviour(listen_to_image_behavior)
-    
-        # ping_behavior = self.PingBehaviour(to=f"{self.other_agent}@prosody")
-        # self.add_behaviour(ping_behavior)
-        
-        # pong_behavior = self.PongBehaviour()
-        # self.add_behaviour(pong_behavior)
-        
-
         logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
        
         self.add_behaviour(self.MoveAndMeasureBehaviour())
-        logger.info("[Agent] Behaviors added, setup complete.")
+        logger.info("[Agent] Behaviors added, setup complete.") 
+
 
     async def stop(self):
         logger.info(f"[Agent] Stopping AlphaBotAgent {self.jid}")
