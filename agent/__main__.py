@@ -1,14 +1,13 @@
 import base64
-from agent.alphabotlib.Camera import get_picture_base64
 from spade.agent import Agent
-from spade.behaviour import CyclicBehaviour, PeriodicBehaviour, OneShotBehaviour
+from spade.behaviour import TimeoutBehaviour
 from spade.message import Message
-from agent.alphabotlib.AlphaBot2 import AlphaBot2
+from spade.template import Template
 import asyncio
 import os
-import time
 import logging
 import asyncio
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -20,29 +19,24 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
     log.setLevel(logging.DEBUG)
     log.propagate = True
 
+IMAGE_FREQUENCY = 0.5 # seconds
+
 class AlphaBotAgent(Agent):
-    class RegisterToCameraAgentBehaviour(OneShotBehaviour):
+    class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
+            thread_id = uuid.uuid4()
             msg = Message(to="camera_agent@prosody") 
-            msg.body = "register"
+            msg.body = "request_image"
+            msg.thread = str(thread_id)
             
-            logger.info("[Behavior] Registering to camera agent...")
+            logger.info("[Behavior] Requesting image to camera agent...")
             await self.send(msg)
-            logger.info("[Behavior] Registration message sent.")
 
-    class UnregisterFromCameraAgentBehaviour(OneShotBehaviour):
-        async def run(self):
-            msg = Message(to="camera_agent@prosody") 
-            msg.body = "unregister"
-            
-            logger.info("[Behavior] Unregistering from camera agent...")
-            await self.send(msg)
-            logger.info("[Behavior] Unregistration message sent.")
+            template = Template()
+            template.thread = thread_id
 
-    class ListenForImageBehaviour(CyclicBehaviour):
-        async def run(self):
-            msg = await self.receive(timeout=15)
-            if msg and msg.body.startswith("image "):
+            reply = await self.receive(timeout=10, template=template)
+            if reply and reply.body.startswith("image "):
                 logger.info(f"[Behavior] Received image message from {msg.sender}")
                 time_ms = asyncio.get_event_loop().time() * 1000
                 logger.info(f"[Behavior] Message received at {time_ms} ms")
@@ -52,19 +46,22 @@ class AlphaBotAgent(Agent):
                 logger.info("[Behavior] Decoding image..." )
                 decoded_img = base64.b64decode(encoded_img)
                 logger.info("[Behavior] Image decoded.")
+
+                now = asyncio.get_event_loop().time() * 1000
+                request_image_behavior = self.RequestImageBehaviour(start_at=now + IMAGE_FREQUENCY * 1000)
+                self.agent.add_behaviour(request_image_behavior)
             else:
                 logger.debug("[Behavior] No message received during timeout.")
+
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
         # Add command listener behavior
-        register_behavior = self.RegisterToCameraAgentBehaviour()
-        self.add_behaviour(register_behavior)
-
-        listen_for_image_behavior = self.ListenForImageBehaviour()
-        self.add_behaviour(listen_for_image_behavior)
+        now = asyncio.get_event_loop().time() * 1000
+        request_image_behavior = self.RequestImageBehaviour(start_at=now)
+        self.add_behaviour(request_image_behavior)
         
         logger.info("[Agent] Behaviors added, setup complete.")
 
