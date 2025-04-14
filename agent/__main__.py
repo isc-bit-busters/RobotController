@@ -1,7 +1,8 @@
 import base64
+import datetime
 import math
 from spade.agent import Agent
-from spade.behaviour import TimeoutBehaviour, OneShotBehaviour
+from spade.behaviour import TimeoutBehaviour, OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from spade.template import Template
 import asyncio
@@ -11,13 +12,13 @@ import asyncio
 import uuid
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AlphaBotAgent")
 
 # Enable SPADE and XMPP specific logging
 for log_name in ["spade", "aioxmpp", "xmpp"]:
     log = logging.getLogger(log_name)
-    log.setLevel(logging.DEBUG)
+    log.setLevel(logging.INFO)
     log.propagate = True
 
 IMAGE_INTERVAL_MS = 500 
@@ -27,37 +28,45 @@ class AlphaBotAgent(Agent):
     def __init__(self, jid, password, verify_security=True, name=None):
         super().__init__(jid=jid, password=password, verify_security=verify_security)
         self.robot_name = name
+        self.other_agent = "mael" if name == "gerald" else "gerald"
 
     class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
-            thread_id = uuid.uuid4()
             msg = Message(to="camera_agent@prosody") 
             msg.body = "request_image"
-            msg.thread = str(thread_id)
-            
-            logger.info("[Behavior] Requesting image to camera agent...")
+            now = datetime.datetime.now()
+
+            logger.info(f"[Behavior] Requesting image at {now}...") 
             await self.send(msg)
 
-            template = Template()
-            template.thread = thread_id
-
-            reply = await self.receive(timeout=10, template=template)
-            if reply and reply.body.startswith("image "):
+            delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
+            request_image_behavior = self.agent.RequestImageBehaviour(start_at=now + delta)
+            self.agent.add_behaviour(request_image_behavior)
+    
+    class ListenToImageBehaviour(CyclicBehaviour):
+        async def run(self):
+            logger.info("[Behavior] Listening for image messages...")
+            msg = await self.receive(timeout=1)
+            if msg and msg.body.startswith("image "):
                 logger.info(f"[Behavior] Received image message from {msg.sender}")
                 time_ms = asyncio.get_event_loop().time() * 1000
                 logger.info(f"[Behavior] Message received at {time_ms} ms")
+
+                if str(msg.sender).startswith("camera_agent@"):
+                    # forward the message to the other robot
+                    logger.info(f"[Behavior] Forwarding image to {self.agent.other_agent}...")
+                    forward_msg = Message(to=f"{self.agent.other_agent}@prosody")
+                    forward_msg.body = msg.body
+                    await self.send(forward_msg)
+                    logger.info(f"[Behavior] Image forwarded to {self.agent.other_agent}.")
 
                 encoded_img = msg.body.split("image ")[1].strip()
 
                 logger.info("[Behavior] Decoding image..." )
                 decoded_img = base64.b64decode(encoded_img)
                 logger.info("[Behavior] Image decoded.")
-
-                now = asyncio.get_event_loop().time() * 1000
-                request_image_behavior = self.RequestImageBehaviour(start_at=now + IMAGE_INTERVAL_MS)
-                self.agent.add_behaviour(request_image_behavior)
             else:
-                logger.debug("[Behavior] No message received during timeout.")
+                logger.debug("[Behavior] Message received but not an image.")
 
     class PingBehaviour(OneShotBehaviour):
         def __init__(self, to, **kwargs):
@@ -98,19 +107,22 @@ class AlphaBotAgent(Agent):
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
         # gerald requests images on x.0 and x.5 sec, mael on x.25 and x.75 sec 
-        now = asyncio.get_event_loop().time() * 1000
-        staggered_start_time = math.ceil(now / IMAGE_INTERVAL_MS) * IMAGE_INTERVAL_MS 
-        staggered_start_time += IMAGE_OFFSET_MS if self.robot_name == "mael" else 0
+        now = datetime.datetime.now()
+        staggered_start_time = now + datetime.timedelta(milliseconds=IMAGE_OFFSET_MS if self.robot_name == "mael" else 0)
+
+        logger.info(f"[Agent] Staggered start time: {staggered_start_time}")
 
         request_image_behavior = self.RequestImageBehaviour(start_at=staggered_start_time)
         self.add_behaviour(request_image_behavior)
+
+        listen_to_image_behavior = self.ListenToImageBehaviour()
+        self.add_behaviour(listen_to_image_behavior)
     
-        other = "mael" if self.robot_name == "gerald" else "gerald"
-        ping_behavior = self.PingBehaviour(to=f"{other}@prosody")
-        self.add_behaviour(ping_behavior)
+        # ping_behavior = self.PingBehaviour(to=f"{self.other_agent}@prosody")
+        # self.add_behaviour(ping_behavior)
         
-        pong_behavior = self.PongBehaviour()
-        self.add_behaviour(pong_behavior)
+        # pong_behavior = self.PongBehaviour()
+        # self.add_behaviour(pong_behavior)
         
         logger.info("[Agent] Behaviors added, setup complete.")
 
