@@ -175,15 +175,15 @@ class AlphaBotAgent(Agent):
 
             # gerald requests images on x.0 and x.5 sec, mael on x.25 and x.75 sec 
             now = datetime.datetime.now()
-            staggered_start_time = now + datetime.timedelta(milliseconds=IMAGE_OFFSET_MS if self.robot_name == "mael" else 0)
+            staggered_start_time = now + datetime.timedelta(milliseconds=IMAGE_OFFSET_MS if self.agent.robot_name == "mael" else 0)
 
             logger.info(f"[Agent] Staggered start time: {staggered_start_time}")
 
-            request_image_behavior = self.RequestImageBehaviour(start_at=staggered_start_time)
-            self.add_behaviour(request_image_behavior)
+            request_image_behavior = self.agent.RequestImageBehaviour(start_at=staggered_start_time)
+            self.agent.add_behaviour(request_image_behavior)
 
-            listen_to_image_behavior = self.ListenToImageBehaviour()
-            self.add_behaviour(listen_to_image_behavior)
+            listen_to_image_behavior = self.agent.ListenToImageBehaviour()
+            self.agent.add_behaviour(listen_to_image_behavior)
         
             # ping_behavior = self.PingBehaviour(to=f"{self.other_agent}@prosody")
             # self.add_behaviour(ping_behavior)
