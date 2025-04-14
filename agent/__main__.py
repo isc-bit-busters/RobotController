@@ -7,15 +7,24 @@ from spade.message import Message
 from spade.template import Template
 import asyncio
 import os
+import time
 import logging
 import asyncio
+import numpy as np
+import cv2
 import uuid
+
+from spade.agent import Agent
+from spade.behaviour import OneShotBehaviour, CyclicBehaviour
+from spade.message import Message
+from agent.alphabotlib.AlphaBot2 import AlphaBot2
+from agent.alphabotlib.test import detectAruco
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("AlphaBotAgent")
 
-# Enable SPADE and XMPP specific logging
+# Enable SPADE and XMPP-specific logging
 for log_name in ["spade", "aioxmpp", "xmpp"]:
     log = logging.getLogger(log_name)
     log.setLevel(logging.INFO)
@@ -27,6 +36,7 @@ IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
 class AlphaBotAgent(Agent):
     def __init__(self, jid, password, verify_security=True, name=None):
         super().__init__(jid=jid, password=password, verify_security=verify_security)
+        self.alphabot = AlphaBot2()
         self.robot_name = name
         self.other_agent = "mael" if name == "gerald" else "gerald"
 
@@ -38,6 +48,7 @@ class AlphaBotAgent(Agent):
 
             logger.info(f"[Behavior] Requesting image at {now}...") 
             await self.send(msg)
+            logger.info("[Behavior] Registration message sent.")
 
             delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
             request_image_behavior = self.agent.RequestImageBehaviour(start_at=now + delta)
@@ -101,6 +112,64 @@ class AlphaBotAgent(Agent):
                 else:
                     logger.debug("[Behavior] No ping message received during timeout.")
 
+    class MoveAndMeasureBehaviour(OneShotBehaviour):
+        async def run(self):
+            robot_id = 7
+
+            # === STEP 1: Take the first image ===
+            logger.info("[Step 1] Requesting initial image...")
+            msg = Message(to="camera_agent@prosody", body="request_image")
+            await self.send(msg)
+
+            reply = await self.receive(timeout=10)
+            if not reply or not reply.body.startswith("image "):
+                logger.warning("[Step 1] No image received.")
+                return
+
+            encoded_img = reply.body.split("image ")[1].strip()
+            # print(encoded_img)
+            img1 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
+            arucos1 = detectAruco(img1)
+            print(f"Detected Arucos: {arucos1}")
+            if robot_id not in arucos1:
+                logger.warning("[Step 1] Robot ID not found in initial image.")
+
+            pos1 = arucos1[robot_id]
+            logger.info(f"[Step 1] Robot initial position: {pos1}")
+
+            t = 2  # seconds
+            # === STEP 2: Move the robot ===
+            logger.info("[Step 2] Moving robot forward...")
+            self.agent.alphabot.advance(t)  # Move for 2 seconds
+            await asyncio.sleep(t)
+
+            # === STEP 3: Take the second image ===
+            logger.info("[Step 3] Requesting image after movement...")
+            msg2 = Message(to="camera_agent@prosody", body="request_image")
+            await self.send(msg2)
+
+            reply2 = await self.receive(timeout=10)
+            if not reply2 or not reply2.body.startswith("image "):
+                logger.warning("[Step 3] No image received after move.")
+
+            encoded_img2 = reply2.body.split("image ")[1].strip()
+            img2 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img2), np.uint8), cv2.IMREAD_COLOR)
+            arucos2 = detectAruco(img2)
+            if robot_id not in arucos2:
+                logger.warning("[Step 3] Robot ID not found in second image.")
+
+            pos2 = arucos2[robot_id]
+            logger.info(f"[Step 3] Robot new position: {pos2}")
+
+            # === STEP 4: Compute distance ===
+            dist = np.sqrt(
+                (pos2["x"] - pos1["x"]) ** 2 + (pos2["y"] - pos1["y"]) ** 2
+            )
+            
+            logger.info(f"[Step 4] Distance moved: {dist}")
+            speed = dist /t
+            logger.info(f"[Step 4] Speed: {speed} units/s")
+            
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -124,9 +193,18 @@ class AlphaBotAgent(Agent):
         # pong_behavior = self.PongBehaviour()
         # self.add_behaviour(pong_behavior)
         
+
+        logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
+       
+        self.add_behaviour(self.MoveAndMeasureBehaviour())
         logger.info("[Agent] Behaviors added, setup complete.")
 
+    async def stop(self):
+        logger.info(f"[Agent] Stopping AlphaBotAgent {self.jid}")
+        await super().stop()
+        logger.info("[Agent] Stopped.")
 
+# === MAIN ===
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
     xmpp_username = os.environ.get("XMPP_USERNAME")
@@ -136,11 +214,10 @@ async def main():
 
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
-    
-    logger.info("Starting AlphaBot XMPP Agent")
+
+    logger.info("Starting AlphaBot XMPP Agent...")
     logger.info(f"XMPP JID: {xmpp_jid}")
-    logger.info(f"XMPP Password: {'*' * len(xmpp_password)}")
-    
+
     try:
         agent = AlphaBotAgent(
             jid=xmpp_jid, 
@@ -152,17 +229,15 @@ async def main():
         logger.info("Agent created, attempting to start...")
         await agent.start(auto_register=True)
         logger.info("Agent started successfully!")
-        
-        try:
-            while agent.is_alive():
-                logger.debug("Agent is alive and running...")
-                await asyncio.sleep(10)  # Log every 10 seconds that agent is alive
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received")
-            await agent.stop()
-            logger.info("Agent stopped by user.")
+
+        while agent.is_alive():
+            await asyncio.sleep(10)
+
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received. Stopping agent...")
+        await agent.stop()
     except Exception as e:
-        logger.error(f"Error starting agent: {str(e)}", exc_info=True)
+        logger.error(f"Error: {e}", exc_info=True)
 
 if __name__ == "__main__":
     try:
