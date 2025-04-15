@@ -13,6 +13,8 @@ import asyncio
 import numpy as np
 import cv2
 import uuid
+from camera_api import CameraHandler
+import vision
 
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
@@ -277,7 +279,23 @@ async def main():
     xmpp_username = os.environ.get("XMPP_USERNAME")
     if not xmpp_username:
         logger.error("XMPP_USERNAME environment variable is not set.")
-        return        
+        return 
+    
+    ##Test camera api
+    camera_api = CameraHandler()
+    camera_api.initialize_camera()
+    image=camera_api.capture_image()
+    
+    #Vision
+    model=vision.load_model('yolov5n.onnx')
+    calib=vision.load_calibration('camera_calibration.npz')
+    frame=vision.preprocess_image(image)
+    
+    #Detection
+    results=vision.detect_objects(model,frame,calib)
+    print(results)
+    
+         
 
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
