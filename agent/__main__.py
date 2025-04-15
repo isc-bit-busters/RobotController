@@ -1,6 +1,8 @@
 import base64
 import datetime
 import math
+from agent.vision import *
+from agent.camera_api import CameraHandler
 from spade.agent import Agent
 from spade.behaviour import TimeoutBehaviour, OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
@@ -13,8 +15,7 @@ import asyncio
 import numpy as np
 import cv2
 import uuid
-from camera_api import CameraHandler
-import vision
+
 
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
@@ -287,12 +288,12 @@ async def main():
     image=camera_api.capture_image()
     
     #Vision
-    model=vision.load_model('yolov5n.onnx')
-    calib=vision.load_calibration('camera_calibration.npz')
-    frame=vision.preprocess_image(image)
+    model=load_model('yolov5n.onnx')
+    calib=load_calibration('camera_calibration.npz')
+    frame=preprocess_image(image)
     
     #Detection
-    results=vision.detect_objects(model,frame,calib)
+    results=detect_cubes(model,frame,calib)
     print(results)
     
          
