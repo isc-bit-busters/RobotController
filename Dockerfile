@@ -34,6 +34,12 @@ RUN apt update && apt install -y \
     libglib2.0-dev \
     python3-kms++
 
+
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Install Python packages required by libcamera's build system
 RUN pip install meson ninja jinja2 pyyaml ply
 
@@ -79,4 +85,6 @@ ENV PYTHONPATH=/usr/local/lib/aarch64-linux-gnu/python3.9/site-packages:$PYTHONP
 WORKDIR /agent
 COPY . .
 
-CMD ["python3", "-m", "camera_api"]
+WORKDIR ..
+
+CMD ["python3","-m", "agent"]
