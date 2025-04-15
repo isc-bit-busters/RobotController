@@ -8,3 +8,4 @@ pynavmesh
 trimesh
 numpy 
 onnxruntime
+pillow

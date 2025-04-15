@@ -21,8 +21,8 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco, get_walls
-from agent.nav_utils import generate_navmesh, find_path
+from agent.alphabotlib.test import detectAruco, get_walls, load_points, build_transformation
+from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -46,13 +46,13 @@ class AlphaBotAgent(Agent):
 
     class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
+            thread_id = str(uuid.uuid4())
             msg = Message(to="camera_agent@prosody") 
             msg.body = "request_image"
+            msg.thread = thread_id
+            msg.metadata = {"thread": thread_id}
             now = datetime.datetime.now()
-
-            logger.info(f"[Behavior] Requesting image at {now}...") 
             await self.send(msg)
-            logger.info("[Behavior] Registration message sent.")
 
             delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
             request_image_behavior = self.agent.RequestImageBehaviour(start_at=now + delta)
@@ -61,7 +61,7 @@ class AlphaBotAgent(Agent):
     class ListenToImageBehaviour(CyclicBehaviour):
         async def run(self):
             robot_id = 7
-            goal_id = 6
+            goal_id = 5
 
             logger.info("[Behavior] Listening for image messages...")
             msg = await self.receive(timeout=1)
@@ -90,11 +90,17 @@ class AlphaBotAgent(Agent):
                 arucos = detectAruco(img)
                 print(f"Detected Arucos: {arucos}")
                 if robot_id not in arucos:
-                    logger.warning("[] Robot ID not found in image.")
+                    logger.warning("[Behaviour] ⚠ Robot ID not found in image.")
+                    return
+
+                if goal_id not in arucos:
+                    logger.warning("[Behaviour] ⚠ Goal ID not found in image.")
+                    return
+
                 pos1 = arucos[robot_id]
                 pos2 = arucos[goal_id]
                 
-                logger.info(f"[] going from {pos1} to {pos2}")
+                logger.info(f"[Behaviour] going from {pos1} to {pos2}")
 
                 path = find_path((pos1["x"], 0, pos1["y"]), (pos2["x"], 0, pos2["y"]), *self.agent.navmesh)
 
@@ -102,68 +108,165 @@ class AlphaBotAgent(Agent):
                     logger.info(f"[Behavior] Path found: {path}")
                 else:
                     logger.warning("[Behavior] No path found.")
-                    
+                    return
+
+                if len(path) < 2:
+                    logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
+                    return
+
+                next_waypoint = path[1]
+                last_waypoint = path[-1]
+                dist_to_first_waypoint = math.sqrt(
+                    (next_waypoint[0] - pos1["x"]) ** 2 + (next_waypoint[2] - pos1["y"]) ** 2
+                )
+
+                if dist_to_first_waypoint < 40:
+                    logger.info("[Behaviour] Next waypoint too close, skipping to next")
+                    if len(path) < 3:
+                        logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
+                        return
+
+                    next_waypoint = path[2]
+                    dist_to_first_waypoint = math.sqrt(
+                        (next_waypoint[0] - pos1["x"]) ** 2 + (next_waypoint[2] - pos1["y"]) ** 2
+                    )
+
+                time_to_move = self.agent.alphabot.get_move_time(dist_to_first_waypoint)
+
+                logger.info(f"[Behavior] Next waypoint: {next_waypoint}")
+                logger.info(f"[Behavior] Current position: {pos1}")
+                logger.info(f"[Behavior] Distance to first waypoint: {dist_to_first_waypoint}")
+                logger.info(f"[Behavior] Time to first waypoint: {time_to_move} seconds")
+
+                if self.agent.alphabot.gotoing:
+                    logger.info("[Behavior] Already going to a waypoint, skipping this message.")
+                    return
+
+                self.agent.alphabot.goto(pos1["x"], pos1["y"], next_waypoint[0], next_waypoint[2], pos1["angle"], max_time=100)
+
+                # draw the navmesh on the image
+                navmesh_overlay = np.zeros_like(img)
+                for polygon in self.agent.navmesh[1]:
+                    pts = np.array([[self.agent.navmesh[0][i][0] * navmesh_scale, self.agent.navmesh[0][i][2] * navmesh_scale] for i in polygon], np.int32)
+                    cv2.fillPoly(navmesh_overlay, [pts], (60, 190, 60), lineType=cv2.LINE_AA)
+                    cv2.polylines(img, [pts], isClosed=True, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+
+                cv2.addWeighted(navmesh_overlay, 0.2, img, 1, 0, img)
+
+                # draw the path on the image
+                for i in range(len(path) - 1):
+                    pt1 = (int(path[i][0]), int(path[i][2]))
+                    pt2 = (int(path[i + 1][0]), int(path[i + 1][2]))
+                    cv2.line(img, pt1, pt2, (0, 255, 255), 2)
+                    cv2.circle(img, pt1, 5, (0, 255, 255), -1)
+
+                # Show the robot in red and the next waypoint in blue
+                cv2.circle(img, (int(pos1["x"]), int(pos1["y"])), 5, (0, 0, 255), -1)
+                cv2.circle(img, (int(next_waypoint[0]), int(next_waypoint[2])), 5, (255, 0, 0), -1)
+                cv2.circle(img, (int(last_waypoint[0]), int(last_waypoint[2])), 5, (255, 0, 255), -1)
+
+                trans = self.agent.trans
+                real_robot_pos = trans((pos1["x"], pos1["y"]))
+                real_robot_pos = (real_robot_pos[0], real_robot_pos[1])
+
+                print(f"Real robot position: {real_robot_pos}")
+
+                cv2.circle(img, (real_robot_pos[0], real_robot_pos[1]), 5, (255, 255, 255), -1)
+
+
+                # Draw line showing the robot's angle 
+                angle_rad = math.radians(pos1["angle"])
+                angle_length = 50  # Length of the line
+                pt1 = (int(pos1["x"]), int(pos1["y"]))
+                pt2 = (int(pos1["x"] + angle_length * math.sin(angle_rad)),
+                        int(pos1["y"] + angle_length * math.cos(angle_rad)))
+                cv2.line(img, pt1, pt2, (125, 0, 125), 2)
+
+                # print the angle as text next to the robot
+                angle_text = f"Angle: {pos1['angle']:.2f}°"
+                cv2.putText(img, angle_text, (int(pos1["x"]) + 5, int(pos1["y"])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                cv2.imwrite(f"/agent/path_image_{int(time.time())}.jpg", img)
 
             else:
                 logger.debug("[Behavior] Message received but not an image.")
 
-    class PingBehaviour(OneShotBehaviour):
-        def __init__(self, to, **kwargs):
-            super().__init__(**kwargs)
-            self.to = to # waf
-
-        async def run(self):
-            msg = Message(to=self.to) 
-            msg.body = "ping"
-            logger.info("[Behavior] Sending ping to camera agent...")
+    class InitBehaviour(OneShotBehaviour):
+        async def request_image(self, name=None):
+            thread_id = str(uuid.uuid4())
+            msg = Message(to="camera_agent@prosody", body="request_image")
+            msg.thread = thread_id
+            msg.metadata = {"thread": thread_id}
             await self.send(msg)
 
-            reply = await self.receive(timeout=30)
-            if reply:
-                logger.info(f"[Behavior] Received ping reply from {msg.sender}")
-            else:
-                logger.debug("[Behavior] No ping reply received during timeout.")
+            logger.info(f"[Behavior] Requesting image from camera agent on thread {thread_id}...")
 
-    class PongBehaviour(OneShotBehaviour):
-        async def run(self):
-            while True:
-                msg = await self.receive(timeout=30)
-                if msg:
-                    if msg.body != "ping":
-                        continue
+            reply = await self.receive(timeout=20)
+            while not reply or not reply.thread == thread_id or not reply.body.startswith("image "):
+                has_reply = reply is not None
+                thread = reply.thread if reply else None
+                message = reply.body[20:] if reply else None
 
-                    logger.info(f"[Behavior] Received ping from {msg.sender}")
-                    reply = Message(to=str(msg.sender))
-                    reply.body = "pong"
-                    logger.info("[Behavior] Sending pong reply...")
-                    await self.send(reply)
-                else:
-                    logger.debug("[Behavior] No ping message received during timeout.")
+                logger.info(f"[Behavior] Received reply: {has_reply}, thread: {thread}, message: {message}")
 
-    class InitBehaviour(OneShotBehaviour):
+                logger.warning("No image received, retrying")
+                await asyncio.sleep(1)
+
+                thread_id = str(uuid.uuid4())
+                msg = Message(to="camera_agent@prosody", body="request_image")
+                msg.thread = thread_id
+                msg.metadata = {"thread": thread_id}
+                await self.send(msg)
+                logger.info(f"[Behavior] Requesting image from camera agent on thread {thread_id}...")
+                reply = await self.receive(timeout=20)
+
+            encoded_img = reply.body.split("image ")[1].strip()
+            img = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
+
+            if name is not None:
+                cv2.imwrite(f"{name}.jpg", img)
+
+            return img
+
         async def run(self):
             robot_id = 7
 
-            logger.info("[Step 0] Requesting initial image...")
-            msg = Message(to="camera_agent@prosody", body="request_image")
-            await self.send(msg)
+            a_points, b_points = load_points("/agent/points_mapping.png")
+            logger.info(f"[Step 0] Points loaded: {a_points}, {b_points}")
 
-            reply = await self.receive(timeout=10)
-            if not reply or not reply.body.startswith("image "):
-                logger.warning("[Step 0] No image received.")
-                return
+            trans = build_transformation(a_points, b_points)
 
-            encoded_img = reply.body.split("image ")[1].strip()
-            # print(encoded_img)
-            img0 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
+            self.agent.trans = trans
 
             # === STEP 0: Generate NavMesh ===
-            logger.info("[Step 0] Generating NavMesh...")
-            walls = get_walls(img0)
 
-            logger.info(f"[Step 0] Detected walls: {walls}")
-                
-            vertices, polygons = generate_navmesh(walls)
+            if os.path.exists("/agent/navmesh.txt"):
+                logger.info(f"[Step 0] Cached NavMesh found, loading from cache file")
+                with open("/agent/navmesh.txt", "r") as f:
+                    lines = f.readlines()
+                    vertices = eval(lines[0])
+                    polygons = eval(lines[1])
+            else:
+                logger.info("[Step 0] No cached NavMesh found, generating a new one...")
+
+                logger.info("[Step 0] Requesting initial image...")
+                img0 = await self.request_image("0_initial")
+
+                cv2.imwrite("/agent/navmesh_image.jpg", img0)
+
+                walls = get_walls(img0)
+
+                logger.info(f"[Step 0] Detected walls: {walls}")
+                before_time = time.time()
+                logger.info("[Step 0] Generating NavMesh...")
+                vertices, polygons = generate_navmesh(walls)
+
+                with open("/agent/navmesh.txt", "w") as f:
+                    f.write(f"{vertices}\n")
+                    f.write(f"{polygons}\n")
+
+                after_time = time.time()
+                logger.info(f"[Step 0] NavMesh generated in {after_time - before_time:.2f} seconds")
 
             logger.info(f"[Step 0] NavMesh vertices: {vertices}")
             logger.info(f"[Step 0] NavMesh polygons: {polygons}")
@@ -176,21 +279,11 @@ class AlphaBotAgent(Agent):
 
                 # === STEP 1: Take the first image ===
                 logger.info("[Step 1] Requesting initial image...")
-                msg = Message(to="camera_agent@prosody", body="request_image")
-                await self.send(msg)
-
-                reply = await self.receive(timeout=10)
-                if not reply or not reply.body.startswith("image "):
-                    logger.warning("[Step 1] No image received.")
-                    return
-
-                encoded_img = reply.body.split("image ")[1].strip()
-                # print(encoded_img)
-                img1 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
+                img1 = await self.request_image("1_initial")
                 arucos1 = detectAruco(img1)
                 print(f"Detected Arucos: {arucos1}")
                 if robot_id not in arucos1:
-                    logger.warning("[Step 1] Robot ID not found in initial image.")
+                    logger.warning("[Step 1] ⚠ Robot ID not found in initial image.")
                     continue
 
                 pos1 = arucos1[robot_id]
@@ -209,18 +302,10 @@ class AlphaBotAgent(Agent):
 
             # === STEP 3: Take the second image ===
             logger.info("[Step 3] Requesting image after movement...")
-            msg2 = Message(to="camera_agent@prosody", body="request_image")
-            await self.send(msg2)
-
-            reply2 = await self.receive(timeout=10)
-            if not reply2 or not reply2.body.startswith("image "):
-                logger.warning("[Step 3] No image received after move.")
-
-            encoded_img2 = reply2.body.split("image ")[1].strip()
-            img2 = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img2), np.uint8), cv2.IMREAD_COLOR)
+            img2 = await self.request_image("2_after_move")
             arucos2 = detectAruco(img2)
             if robot_id not in arucos2:
-                logger.warning("[Step 3] Robot ID not found in second image.")
+                logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
 
             pos2 = arucos2[robot_id]
             logger.info(f"[Step 3] Robot new position: {pos2}")
@@ -234,6 +319,30 @@ class AlphaBotAgent(Agent):
             speed = dist / t
             self.agent.alphabot.setSpeed(speed)
             logger.info(f"[Step 4] Speed: {speed} units/s")
+
+            # Calibrate rotation speed
+            rot_t = 0.25
+            self.agent.alphabot.turn_left(rot_t)
+            await asyncio.sleep(rot_t)
+
+            logger.info("[Step 5] Requesting image after rotation...")
+            img3 = await self.request_image("3_after_rotation")
+            arucos3 = detectAruco(img3)
+            if robot_id not in arucos3:
+                logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
+            
+            pos3 = arucos3[robot_id]
+            logger.info(f"[Step 5] Robot new position after rotation: {pos3}")
+
+            rot_angle = pos3["angle"] - pos2["angle"]
+            self.agent.alphabot.setTurnSpeed(rot_angle / rot_t)
+            logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
+            
+            logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
+
+
+
+            await asyncio.sleep(2)
 
             
 
@@ -282,22 +391,30 @@ async def main():
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
     
-    ##Test camera api
+##Test camera api
     camera_api = CameraHandler()
     camera_api.initialize_camera()
-    image=camera_api.capture_image()
-    
-    #Vision
-    model=load_model('yolov5n.onnx')
-    calib=load_calibration('camera_calibration.npz')
-    frame=preprocess_image(image)
-    
+   
+    # Vision
+    session, input_name = load_model('/agent/yolov5n.onnx')
+    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
+ 
+    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
+    image = camera_api.capture_image()
+   
     #Detection
-    results=detect_cubes(model,frame,calib)
+    results = detect_cubes(
+        image=image,
+        session=session,
+        input_name=input_name,
+        camera_matrix=camera_matrix,
+        dist_coeffs=dist_coeffs,
+        focal_length=focal_length
+    )
+ 
+    # Résultats
     print(results)
     
-         
-
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
 

@@ -2,3 +2,11 @@
 __pycache__
 .idea
 .vscode
+
+agent/navmesh.txt
+agent/detected_lines.jpg
+agent/navmesh_image.jpg
+agent/navmesh_raw.txt
+agent/path_image_*.jpg
+agent/polygons.jpg
+agent/polygons.txt

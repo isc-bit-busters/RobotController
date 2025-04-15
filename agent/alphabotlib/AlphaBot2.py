@@ -1,6 +1,9 @@
 import RPi.GPIO as GPIO
 import time
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AlphaBot2(object):
 	def __init__(self,ain1=12,ain2=13,ena=6,bin1=20,bin2=21,enb=26):
@@ -13,6 +16,8 @@ class AlphaBot2(object):
 		self.PA  = 50
 		self.PB  = 50
 		self.speed = 1.0
+		self.turn_speed = 1.0
+		self.gotoing = False
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -55,8 +60,8 @@ class AlphaBot2(object):
 
 		
 	def left(self):
-		self.PWMA.ChangeDutyCycle(30)
-		self.PWMB.ChangeDutyCycle(30)
+		self.PWMA.ChangeDutyCycle(30/2)
+		self.PWMB.ChangeDutyCycle(30/2)
 		GPIO.output(self.AIN1,GPIO.HIGH)
 		GPIO.output(self.AIN2,GPIO.LOW)
 		GPIO.output(self.BIN1,GPIO.LOW)
@@ -64,8 +69,8 @@ class AlphaBot2(object):
 
 
 	def right(self):
-		self.PWMA.ChangeDutyCycle(30)
-		self.PWMB.ChangeDutyCycle(30)
+		self.PWMA.ChangeDutyCycle(30/2)
+		self.PWMB.ChangeDutyCycle(30/2)
 		GPIO.output(self.AIN1,GPIO.LOW)
 		GPIO.output(self.AIN2,GPIO.HIGH)
 		GPIO.output(self.BIN1,GPIO.HIGH)
@@ -76,7 +81,7 @@ class AlphaBot2(object):
 		DR = 16
 		DL = 19
 
-		print(f"Advance {duration}")
+		logger.info(f"Advance {duration}")
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -95,8 +100,10 @@ class AlphaBot2(object):
 		# 		print("Turn right")
 		# 	else:
 
+		# self.setPWMA(7.8)
+		# self.setPWMB(7.3)
 		self.setPWMA(7.8)
-		self.setPWMB(7.3)
+		self.setPWMB(7.8)
 		self.forward()
 		time.sleep(duration)
 		self.stop()
@@ -105,36 +112,85 @@ class AlphaBot2(object):
 	def get_move_time(self, dist):
 		return dist / self.speed
 
+	
+	def get_rotation_time(self, angle):
+		return abs(angle) / self.turn_speed
 
-	def turn(self, deg):
-		if deg > 0:
-			self.left()
-		else:
-			self.right()
-		time.sleep(abs(deg)/640.0)
+
+	def turn_left(self, turn_time):
+		self.left()
+		logger.info(f"Turning left for {turn_time} seconds")
+		time_before = time.time()
+		time.sleep(turn_time)
+		time_after = time.time()
+		logger.info(f"Time taken to turn left: {time_after - time_before} seconds")
 		self.stop()
 
 
-	def goto(self, x1, y1, x2, y2, curr_angle):
-		angle = math.atan2(y2 - y1, x2 - x1) * 180 / math.pi
+	def turn_right(self, turn_time):
+		self.right()
+		logger.info(f"Turning right for {turn_time} seconds")
+		time_before = time.time()
+		time.sleep(turn_time)
+		time_after = time.time()
+		logger.info(f"Time taken to turn right: {time_after - time_before} seconds")
+		self.stop()
+
+	def get_angle_between(self, x1, y1, x2, y2):
+		angle = math.atan2(x2 - x1, y2 - y1)
+		angle = math.degrees(angle)  # Convert to degrees
+		angle = angle % 360  # Normalize angle to [0, 360)
+		return angle 
+
+
+	def goto(self, x1, y1, x2, y2, curr_angle, max_time=0.25):
+		if self.gotoing == True:
+			return 0
+
+		self.gotoing = True
+		self.stop()
+		sleep_time = 0.1
+		angle = self.get_angle_between(x1, y1, x2, y2)
+
+		logger.info(f"Current angle: {curr_angle}")
+		logger.info(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
+		logger.info(f"Angle x1,y1 towards x2,y2 = {angle}")
+
+
 		rot_angle = angle - curr_angle
 		if rot_angle > 180:
 			rot_angle -= 360
 		elif rot_angle < -180:
 			rot_angle += 360
 
-		print(f"Turning {rot_angle}")
+		logger.info(f"Turning {rot_angle}")
 
-		self.turn(rot_angle)
+		spent_time = 0
+		if abs(rot_angle) > 3:
+			rotation_time = float(self.get_rotation_time(rot_angle))
+			# rotation_time = 0.19
+			logger.info(f"ROTATION TIME {rotation_time}")
+			if rot_angle > 0:
+				self.turn_left(rotation_time)
+			else:
+				self.turn_right(rotation_time)
 
-		time.sleep(0.3)
+			time.sleep(sleep_time)
+
+			spent_time += rotation_time + sleep_time
 
 		dist = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 		if dist > 0:
-			self.advance(dist)
+			move_time = self.get_move_time(dist)
+			logger.info(f"Move time: {move_time}")
+			# move_time = max(0, min(move_time, max_time - spent_time))
+			logger.info(f"Real Move time: {move_time}")
+			self.advance(min(move_time, max_time))
 		self.stop()
 
-		time.sleep(0.3)
+		# time.sleep(0.3)
+
+		self.gotoing = False
 
 		return angle
 
@@ -150,6 +206,9 @@ class AlphaBot2(object):
 
 	def setSpeed(self, speed):
 		self.speed = speed
+
+	def setTurnSpeed(self, turn_speed):
+		self.turn_speed = abs(turn_speed)
 
 	def setMotor(self, left, right):
 		if((right >= 0) and (right <= 100)):
