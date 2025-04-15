@@ -1,46 +1,43 @@
-from flask import Flask, Response
 from picamera2 import Picamera2
 import cv2
-import threading
+import sys
 import time
-import subprocess
 
-# === 🔁 Restart the camera system ===
-subprocess.run(["sudo", "systemctl", "restart", "camera"], check=False)
-# Optional: wait a bit to allow hardware to recover
-time.sleep(1)
+try:
+    picam2 = Picamera2()
 
-app = Flask(__name__)
+    camera_info = picam2.global_camera_info()
+    if not camera_info:
+        print("❌ Aucune caméra détectée !")
+        sys.exit(1)
 
-# === Initialize the camera ===
-picam2 = Picamera2()
-picam2.configure(picam2.create_video_configuration(main={"size": (640, 480)}))
-picam2.start()
+    print(f"✅ Caméra(s) détectée(s) : {camera_info}")
 
-frame = None
+    # Libère d'abord toute ancienne instance (important dans Docker !)
+    try:
+    	picam2.stop()  # Juste au cas où, pas de souci si elle n'est pas encore démarrée
+    except Exception as e:
+    	print(f"ℹ️ Aucune instance active à arrêter : {e}")
 
-# === Background thread to grab latest frame continuously ===
-def update_frame():
-    global frame
-    while True:
-        frame = picam2.capture_array()
-        time.sleep(0.03)
 
-threading.Thread(target=update_frame, daemon=True).start()
+    # Configuration
+    picam2.configure(picam2.create_still_configuration(main={"size": (640, 480)}))
+    picam2.start()
+    time.sleep(1)
 
-# === MJPEG Stream endpoint ===
-@app.route('/video_feed')
-def video_feed():
-    def generate():
-        while True:
-            if frame is not None:
-                modified = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                _, jpeg = cv2.imencode('.jpg', modified)
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
-            time.sleep(0.03)
-    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    # Capture
+    frame = picam2.capture_array()
+    cv2.imwrite("captured_image.jpg", frame)
+    print("✅ Image capturée et enregistrée sous 'captured_image.jpg'.")
 
-# === Run server ===
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, threaded=True)
+    # Clean exit
+    picam2.stop()
+
+except RuntimeError as e:
+    print(f"❌ Erreur d'accès à la caméra : {e}")
+    print("💡 Vérifie qu'aucun autre processus ne bloque la caméra dans Docker.")
+    sys.exit(1)
+
+except Exception as e:
+    print(f"❌ Erreur : {e}")
+    sys.exit(1)

@@ -6,6 +6,7 @@ services:
     container_name: agent
     devices:
       - /dev/gpiomem:/dev/gpiomem
+      - /dev:/dev
     privileged: true
     cap_add:
       - SYS_RAWIO
@@ -18,5 +19,7 @@ services:
       PYTHONUNBUFFERED: 1
     volumes:
       - ./agent:/agent
+      - /run/udev:/run/udev:ro
+      - /sys:/sys
     extra_hosts:
       - "prosody:192.168.88.253"
