@@ -1,6 +1,9 @@
 import RPi.GPIO as GPIO
 import time
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AlphaBot2(object):
 	def __init__(self,ain1=12,ain2=13,ena=6,bin1=20,bin2=21,enb=26):
@@ -76,7 +79,7 @@ class AlphaBot2(object):
 		DR = 16
 		DL = 19
 
-		print(f"Advance {duration}")
+		logger.info(f"Advance {duration}")
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -115,7 +118,7 @@ class AlphaBot2(object):
 		self.stop()
 
 
-	def goto(self, x1, y1, x2, y2, curr_angle):
+	def goto(self, x1, y1, x2, y2, curr_angle, max_time=0.25):
 		angle = math.atan2(y2 - y1, x2 - x1) * 180 / math.pi
 		rot_angle = angle - curr_angle
 		if rot_angle > 180:
@@ -123,18 +126,19 @@ class AlphaBot2(object):
 		elif rot_angle < -180:
 			rot_angle += 360
 
-		print(f"Turning {rot_angle}")
+		logger.info(f"Turning {rot_angle}")
 
 		self.turn(rot_angle)
 
-		time.sleep(0.3)
+		# time.sleep(0.3)
 
 		dist = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
 		if dist > 0:
-			self.advance(dist)
+			move_time = self.get_move_time(dist)
+			self.advance(math.min(move_time, max_time))
 		self.stop()
 
-		time.sleep(0.3)
+		# time.sleep(0.3)
 
 		return angle
 

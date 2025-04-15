@@ -12,11 +12,17 @@ def takePicture(camera_index):
             print(f"Camera not found at index {i}")
     #take picture
 
+    # load camera calibration fro npz
+    data = np.load("camera_calibration.npz")
+    mtx = data["mtx"]
+    dist = data["dist"]
+
     cap = cv2.VideoCapture(camera_index)
     if cap.isOpened():
         print(f"Camera found at index {camera_index}")
         ret, frame = cap.read()
         if ret:
+            frame = cv2.undistort(frame, mtx, dist)
             image_path = f"img.jpg"
             cv2.imwrite(image_path, frame)
             print(f"Image saved to {image_path}")
