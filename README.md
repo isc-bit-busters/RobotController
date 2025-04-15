@@ -135,6 +135,73 @@ sudo systemctl enable camera-api    # Démarrage auto au boot
 sudo systemctl start camera-api     # Lance maintenant
 
 
+# How to use CameraHandler
+
+The `CameraHandler` class provides an easy-to-use interface for interacting with the Raspberry Pi camera module. Below are the steps to use it:
+
+### Initialization
+To use the `CameraHandler`, you need to initialize the camera and configure it with the desired resolution.
+
+### Example Usage
+Here’s an example of how to use the `CameraHandler` class:
+
+```python
+from camera_utils import CameraHandler
+
+# Initialize the camera
+cam = CameraHandler(resolution=(640, 480))
+cam.initialize_camera()
+
+# Capture an image
+image = cam.capture_image()
+
+# Save the captured image
+cam.save_image(image, output_path="captured_image.jpg")
+
+# Close the camera
+cam.close()
+```
+
+### Methods Overview
+
+1. **`initialize_camera()`**
+   - Initializes the camera and configures it with the specified resolution.
+   - Raises an error if no camera is detected.
+
+2. **`capture_image(convert_rgb=True)`**
+   - Captures an image from the camera.
+   - Converts the image to RGB format if `convert_rgb` is set to `True`.
+   - Returns the captured image as a NumPy array.
+
+3. **`save_image(frame, output_path="captured_image.jpg")`**
+   - Saves the captured image to the specified file path.
+   - Default file path: `captured_image.jpg`.
+
+4. **`close()`**
+   - Stops the camera and releases resources.
+
+### Running the Script Directly
+You can also run the `camera_api.py` script directly to capture and save an image. The script will:
+1. Initialize the camera.
+2. Capture an image.
+3. Save the image as `captured_image.jpg`.
+4. Close the camera.
+
+Run the script using:
+```bash
+python camera_api.py
+```
+
+The captured image will be saved in the same directory as `camera_api.py`.
+
+### Notes
+- Ensure the Raspberry Pi camera module is properly connected and enabled in the Raspberry Pi configuration.
+- Install the required dependencies (`picamera2`, `opencv-python`) before using the script:
+  ```bash
+  pip install picamera2 opencv-python
+  ```
+
+
 ## License
 
 [Add your license information here]
