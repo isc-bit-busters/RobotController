@@ -89,8 +89,12 @@ class AlphaBotAgent(Agent):
 
                 arucos = detectAruco(img)
                 print(f"Detected Arucos: {arucos}")
-                if robot_id not in arucos or goal_id not in arucos:
-                    logger.warning("[Behaviour] Robot ID not found in image.")
+                if robot_id not in arucos:
+                    logger.warning("[Behaviour] ⚠ Robot ID not found in image.")
+                    return
+
+                if goal_id not in arucos:
+                    logger.warning("[Behaviour] ⚠ Goal ID not found in image.")
                     return
 
                 pos1 = arucos[robot_id]
@@ -106,18 +110,61 @@ class AlphaBotAgent(Agent):
                     logger.warning("[Behavior] No path found.")
                     return
 
-                first_waypoint = path[0]
-                dist_to_first_waypoint = math.sqrt(
-                    (first_waypoint[0] - pos1["x"]) ** 2 + (first_waypoint[2] - pos1["y"]) ** 2
-                )
-                time = self.alphabot.get_move_time(dist_to_first_waypoint)
+                if len(path) < 2:
+                    logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
+                    return
 
-                logger.info(f"[Behavior] First waypoint: {first_waypoint}")
+                next_waypoint = path[1]
+                last_waypoint = path[-1]
+                dist_to_first_waypoint = math.sqrt(
+                    (next_waypoint[0] - pos1["x"]) ** 2 + (next_waypoint[2] - pos1["y"]) ** 2
+                )
+
+                if dist_to_first_waypoint < 15:
+                    logger.info("[Behaviour] Next waypoint too close, skipping to next")
+                    if len(path) < 3:
+                        logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
+                        return
+
+                    next_waypoint = path[2]
+                    dist_to_first_waypoint = math.sqrt(
+                        (next_waypoint[0] - pos1["x"]) ** 2 + (next_waypoint[2] - pos1["y"]) ** 2
+                    )
+
+                time_to_move = self.agent.alphabot.get_move_time(dist_to_first_waypoint)
+
+                logger.info(f"[Behavior] Next waypoint: {next_waypoint}")
                 logger.info(f"[Behavior] Current position: {pos1}")
                 logger.info(f"[Behavior] Distance to first waypoint: {dist_to_first_waypoint}")
-                logger.info(f"[Behavior] Time to first waypoint: {time} seconds")
+                logger.info(f"[Behavior] Time to first waypoint: {time_to_move} seconds")
 
-                self.agent.alphabot.goto(pos1["x"], pos1["y"], first_waypoint[0], first_waypoint[2], pos1["angle"])
+                self.agent.alphabot.goto(pos1["x"], pos1["y"], next_waypoint[0], next_waypoint[2], pos1["angle"], max_time=0.5)
+
+                # draw the path on the image
+                for i in range(len(path) - 1):
+                    pt1 = (int(path[i][0]), int(path[i][2]))
+                    pt2 = (int(path[i + 1][0]), int(path[i + 1][2]))
+                    cv2.line(img, pt1, pt2, (0, 255, 0), 2)
+                    cv2.circle(img, pt1, 5, (0, 255, 0), -1)
+
+                # Show the robot in red and the next waypoint in blue
+                cv2.circle(img, (int(pos1["x"]), int(pos1["y"])), 5, (0, 0, 255), -1)
+                cv2.circle(img, (int(next_waypoint[0]), int(next_waypoint[2])), 5, (255, 0, 0), -1)
+                cv2.circle(img, (int(last_waypoint[0]), int(last_waypoint[2])), 5, (255, 0, 255), -1)
+
+                # Draw line showing the robot's angle 
+                angle_rad = math.radians(pos1["angle"])
+                angle_length = 50  # Length of the line
+                pt1 = (int(pos1["x"]), int(pos1["y"]))
+                pt2 = (int(pos1["x"] + angle_length * math.sin(angle_rad)),
+                        int(pos1["y"] + angle_length * math.cos(angle_rad)))
+                cv2.line(img, pt1, pt2, (125, 0, 125), 2)
+
+                # print the angle as text next to the robot
+                angle_text = f"Angle: {pos1['angle']:.2f}°"
+                cv2.putText(img, angle_text, (int(pos1["x"]) + 5, int(pos1["y"])), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                cv2.imwrite(f"/agent/path_image_{int(time.time())}.jpg", img)
 
             else:
                 logger.debug("[Behavior] Message received but not an image.")
@@ -162,35 +209,39 @@ class AlphaBotAgent(Agent):
         async def run(self):
             robot_id = 7
 
-            logger.info("[Step 0] Requesting initial image...")
-            img0 = await self.request_image("0_initial")
 
             # === STEP 0: Generate NavMesh ===
-            logger.info("[Step 0] Generating NavMesh...")
-            walls = get_walls(img0)
 
-            logger.info(f"[Step 0] Detected walls: {walls}")
-
-            if True:
-                # load navmesh from file
-                with open("navmesh.txt", "r") as f:
+            if os.path.exists("/agent/navmesh.txt"):
+                logger.info(f"[Step 0] Cached NavMesh found, loading from cache file")
+                with open("/agent/navmesh.txt", "r") as f:
                     lines = f.readlines()
                     vertices = eval(lines[0].split(": ")[1].strip())
                     polygons = eval(lines[1].split(": ")[1].strip())
-                    logger.info(f"[Step 0] Loaded NavMesh vertices from cache file")
             else:
+                logger.info("[Step 0] No cached NavMesh found, generating a new one...")
+
+                logger.info("[Step 0] Requesting initial image...")
+                img0 = await self.request_image("0_initial")
+
+                walls = get_walls(img0)
+
+                logger.info(f"[Step 0] Detected walls: {walls}")
+                before_time = time.time()
+                logger.info("[Step 0] Generating NavMesh...")
                 vertices, polygons = generate_navmesh(walls)
+
+                with open("/agent/navmesh.txt", "w") as f:
+                    f.write(f"vertices: {vertices}\n")
+                    f.write(f"polygons: {polygons}\n")
+
+                after_time = time.time()
+                logger.info(f"[Step 0] NavMesh generated in {after_time - before_time:.2f} seconds")
 
             logger.info(f"[Step 0] NavMesh vertices: {vertices}")
             logger.info(f"[Step 0] NavMesh polygons: {polygons}")
 
             self.agent.navmesh = (vertices, polygons)
-
-            # save the navmesh to a file
-            with open("navmesh.txt", "w") as f:
-                f.write(f"vertices: {vertices}\n")
-                f.write(f"polygons: {polygons}\n")
-            
 
             detected_bot = False
             while not detected_bot:
@@ -202,7 +253,7 @@ class AlphaBotAgent(Agent):
                 arucos1 = detectAruco(img1)
                 print(f"Detected Arucos: {arucos1}")
                 if robot_id not in arucos1:
-                    logger.warning("[Step 1] Robot ID not found in initial image.")
+                    logger.warning("[Step 1] ⚠ Robot ID not found in initial image.")
                     continue
 
                 pos1 = arucos1[robot_id]
@@ -224,7 +275,7 @@ class AlphaBotAgent(Agent):
             img2 = await self.request_image("2_after_move")
             arucos2 = detectAruco(img2)
             if robot_id not in arucos2:
-                logger.warning("[Step 3] Robot ID not found in second image.")
+                logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
 
             pos2 = arucos2[robot_id]
             logger.info(f"[Step 3] Robot new position: {pos2}")
@@ -238,6 +289,28 @@ class AlphaBotAgent(Agent):
             speed = dist / t
             self.agent.alphabot.setSpeed(speed)
             logger.info(f"[Step 4] Speed: {speed} units/s")
+
+            # Calibrate rotation speed
+            rot_t = 0.25
+            self.agent.alphabot.turn_left(rot_t)
+            await asyncio.sleep(rot_t)
+
+            logger.info("[Step 5] Requesting image after rotation...")
+            img3 = await self.request_image("3_after_rotation")
+            arucos3 = detectAruco(img3)
+            if robot_id not in arucos3:
+                logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
+            
+            pos3 = arucos3[robot_id]
+            logger.info(f"[Step 5] Robot new position after rotation: {pos3}")
+
+            rot_angle = pos3["angle"] - pos2["angle"]
+            self.agent.alphabot.setTurnSpeed(rot_angle / rot_t)
+            logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
+            
+            logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
+
+            await asyncio.sleep(2)
 
             
 
@@ -286,22 +359,30 @@ async def main():
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
     
-    ##Test camera api
+##Test camera api
     camera_api = CameraHandler()
     camera_api.initialize_camera()
-    image=camera_api.capture_image()
-    
-    #Vision
-    model=load_model('yolov5n.onnx')
-    calib=load_calibration('camera_calibration.npz')
-    frame=preprocess_image(image)
-    
+   
+    # Vision
+    session, input_name = load_model('/agent/yolov5n.onnx')
+    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
+ 
+    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
+    image = camera_api.capture_image()
+   
     #Detection
-    results=detect_cubes(model,frame,calib)
+    results = detect_cubes(
+        image=image,
+        session=session,
+        input_name=input_name,
+        camera_matrix=camera_matrix,
+        dist_coeffs=dist_coeffs,
+        focal_length=focal_length
+    )
+ 
+    # Résultats
     print(results)
     
-         
-
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
 

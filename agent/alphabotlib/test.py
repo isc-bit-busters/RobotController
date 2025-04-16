@@ -77,10 +77,10 @@ def detectAruco(image):
             center_x = np.mean([p[0] for p in corner_points])
             center_y = np.mean([p[1] for p in corner_points])
 
-            arucos_positions[ids[i][0]] = {
+            arucos_positions[int(ids[i][0])] = {
                 "x": center_x,
                 "y": center_y,
-                "angle": angle_degrees,
+                "angle": angle_degrees * -1,
             }
 
             # Draw line showing orientation
