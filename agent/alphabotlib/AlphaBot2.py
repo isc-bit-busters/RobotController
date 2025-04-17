@@ -100,10 +100,10 @@ class AlphaBot2(object):
 		# 		print("Turn right")
 		# 	else:
 
-		# self.setPWMA(7.8)
-		# self.setPWMB(7.3)
 		self.setPWMA(7.8)
-		self.setPWMB(7.8)
+		self.setPWMB(7.3)
+		# self.setPWMA(7.8)
+		# self.setPWMB(7.8)
 		self.forward()
 		time.sleep(duration)
 		self.stop()

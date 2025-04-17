@@ -21,8 +21,8 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco, get_walls
-from agent.nav_utils import generate_navmesh, find_path
+from agent.alphabotlib.test import detectAruco, get_walls, load_points, build_transformation
+from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -144,17 +144,36 @@ class AlphaBotAgent(Agent):
 
                 self.agent.alphabot.goto(pos1["x"], pos1["y"], next_waypoint[0], next_waypoint[2], pos1["angle"], max_time=100)
 
+                # draw the navmesh on the image
+                navmesh_overlay = np.zeros_like(img)
+                for polygon in self.agent.navmesh[1]:
+                    pts = np.array([[self.agent.navmesh[0][i][0] * navmesh_scale, self.agent.navmesh[0][i][2] * navmesh_scale] for i in polygon], np.int32)
+                    cv2.fillPoly(navmesh_overlay, [pts], (60, 190, 60), lineType=cv2.LINE_AA)
+                    cv2.polylines(img, [pts], isClosed=True, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+
+                cv2.addWeighted(navmesh_overlay, 0.2, img, 1, 0, img)
+
                 # draw the path on the image
                 for i in range(len(path) - 1):
                     pt1 = (int(path[i][0]), int(path[i][2]))
                     pt2 = (int(path[i + 1][0]), int(path[i + 1][2]))
-                    cv2.line(img, pt1, pt2, (0, 255, 0), 2)
-                    cv2.circle(img, pt1, 5, (0, 255, 0), -1)
+                    cv2.line(img, pt1, pt2, (0, 255, 255), 2)
+                    cv2.circle(img, pt1, 5, (0, 255, 255), -1)
 
                 # Show the robot in red and the next waypoint in blue
                 cv2.circle(img, (int(pos1["x"]), int(pos1["y"])), 5, (0, 0, 255), -1)
+                cv2.circle(img, (int(path[0][0]), int(path[0][2])), 5, (0, 255, 255), -1)
                 cv2.circle(img, (int(next_waypoint[0]), int(next_waypoint[2])), 5, (255, 0, 0), -1)
                 cv2.circle(img, (int(last_waypoint[0]), int(last_waypoint[2])), 5, (255, 0, 255), -1)
+
+                trans = self.agent.trans
+                real_robot_pos = trans((pos1["x"], pos1["y"]))
+                real_robot_pos = (int(real_robot_pos[0]), int(real_robot_pos[1]))
+
+                print(f"Real robot position: {real_robot_pos}")
+
+                cv2.circle(img, (real_robot_pos[0], real_robot_pos[1]), 5, (255, 255, 255), -1)
+
 
                 # Draw line showing the robot's angle 
                 angle_rad = math.radians(pos1["angle"])
@@ -213,6 +232,12 @@ class AlphaBotAgent(Agent):
         async def run(self):
             robot_id = 7
 
+            a_points, b_points = load_points("/agent/points_mapping.png")
+            logger.info(f"[Step 0] Points loaded: {a_points}, {b_points}")
+
+            trans = build_transformation(a_points, b_points)
+
+            self.agent.trans = trans
 
             # === STEP 0: Generate NavMesh ===
 
@@ -315,6 +340,8 @@ class AlphaBotAgent(Agent):
             logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
             
             logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
+
+
 
             await asyncio.sleep(2)
 

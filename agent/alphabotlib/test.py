@@ -1,6 +1,56 @@
 import cv2
 import numpy as np
 
+def load_points(img_file):
+    # load a_points -> b_points.
+    # points are pixels on the image
+    # a points are colors with alpha channel 255
+    # corresponding b points are same rgb values but with other alpha channel
+
+    # load image file
+    img = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise ValueError(f"Could not open or read image: {img_file}")
+    
+    # Check if the image has an alpha channel
+    if img.shape[2] != 4:
+        raise ValueError(f"Image does not have an alpha channel: {img_file}")
+    
+    # Extract the alpha channel
+    alpha_channel = img[:, :, 3]
+
+    # Get the coordinates of the pixels with alpha channel 255
+    a_points = np.column_stack(np.where(alpha_channel == 255))
+
+    # Get the corresponding RGB values
+    b_points = img[alpha_channel == 255, :3]
+    b_points = np.array(b_points, dtype=np.uint8)
+
+    # Convert to list of tuples
+    a_points = [tuple(point) for point in a_points]
+    b_points = [tuple(point) for point in b_points]
+    return a_points, b_points
+
+def build_transformation(a_points, b_points):
+    # Need at least 4 point pairs
+    assert len(a_points) >= 4, "Need at least 4 point pairs"
+    
+    # Convert to numpy arrays
+    a_points = np.array(a_points, dtype=np.float32)
+    b_points = np.array(b_points, dtype=np.float32)
+    
+    # Calculate homography matrix
+    H, _ = cv2.findHomography(a_points, b_points)
+    
+    def transform_point(img_point):
+        px, py = img_point
+        point = np.array([px, py, 1])
+        transformed = np.dot(H, point)
+        # Normalize by dividing by the third component
+        return transformed[0]/transformed[2], transformed[1]/transformed[2]
+    
+    return transform_point
+
 def takePicture(camera_index):
     #check camera indexes
     for i in range(10):
