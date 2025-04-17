@@ -120,7 +120,7 @@ class AlphaBotAgent(Agent):
                     (next_waypoint[0] - pos1["x"]) ** 2 + (next_waypoint[2] - pos1["y"]) ** 2
                 )
 
-                if dist_to_first_waypoint < 15:
+                if dist_to_first_waypoint < 40:
                     logger.info("[Behaviour] Next waypoint too close, skipping to next")
                     if len(path) < 3:
                         logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
@@ -138,7 +138,11 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Behavior] Distance to first waypoint: {dist_to_first_waypoint}")
                 logger.info(f"[Behavior] Time to first waypoint: {time_to_move} seconds")
 
-                self.agent.alphabot.goto(pos1["x"], pos1["y"], next_waypoint[0], next_waypoint[2], pos1["angle"], max_time=0.5)
+                if self.agent.alphabot.gotoing:
+                    logger.info("[Behavior] Already going to a waypoint, skipping this message.")
+                    return
+
+                self.agent.alphabot.goto(pos1["x"], pos1["y"], next_waypoint[0], next_waypoint[2], pos1["angle"], max_time=100)
 
                 # draw the path on the image
                 for i in range(len(path) - 1):
@@ -216,13 +220,15 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Step 0] Cached NavMesh found, loading from cache file")
                 with open("/agent/navmesh.txt", "r") as f:
                     lines = f.readlines()
-                    vertices = eval(lines[0].split(": ")[1].strip())
-                    polygons = eval(lines[1].split(": ")[1].strip())
+                    vertices = eval(lines[0])
+                    polygons = eval(lines[1])
             else:
                 logger.info("[Step 0] No cached NavMesh found, generating a new one...")
 
                 logger.info("[Step 0] Requesting initial image...")
                 img0 = await self.request_image("0_initial")
+
+                cv2.imwrite("/agent/navmesh_image.jpg", img0)
 
                 walls = get_walls(img0)
 
@@ -232,8 +238,8 @@ class AlphaBotAgent(Agent):
                 vertices, polygons = generate_navmesh(walls)
 
                 with open("/agent/navmesh.txt", "w") as f:
-                    f.write(f"vertices: {vertices}\n")
-                    f.write(f"polygons: {polygons}\n")
+                    f.write(f"{vertices}\n")
+                    f.write(f"{polygons}\n")
 
                 after_time = time.time()
                 logger.info(f"[Step 0] NavMesh generated in {after_time - before_time:.2f} seconds")

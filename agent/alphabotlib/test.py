@@ -120,6 +120,13 @@ def get_walls(img):
     #     print(f"Error: Could not open or read image at {img_path}")
     #     return []
     print(img.shape)
+
+
+    data = np.load("/agent/camera_calibration.npz")
+    mtx = data["camera_matrix"]
+    dist = data["dist_coeffs"]
+    img = cv2.undistort(img, mtx, dist)
+
     # Convert the image to HSV color space
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -143,7 +150,7 @@ def get_walls(img):
     for contour in filtered_contours:
         x, y, w, h = cv2.boundingRect(contour)
         cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)  # Draw rectangles in blue
-    lines = cv2.HoughLinesP(dilated_edges, 1, np.pi/180, threshold=100, minLineLength=50, maxLineGap=3)
+    lines = cv2.HoughLinesP(dilated_edges, 1, np.pi/180, threshold=120, minLineLength=100, maxLineGap=1.5)
     if lines is not None:
         for line in lines:
             x1, y1, x2, y2 = line[0]
@@ -151,11 +158,11 @@ def get_walls(img):
 
             cv2.line(img, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-    cv2.imwrite("detected_lines.jpg", img)
+    cv2.imwrite("/agent/detected_lines.jpg", img)
 
     unique_polygons = []
     for p in polygons:
-        if not any(abs(p[0] - up[0]) < 100 and abs(p[1] - up[1]) < 100 and abs(p[2] - up[2]) < 150 and abs(p[3] - up[3]) < 150 for up in unique_polygons):
+        if not any(abs(p[0] - up[0]) < 70 and abs(p[1] - up[1]) < 70 and abs(p[2] - up[2]) < 100 and abs(p[3] - up[3]) < 100 for up in unique_polygons):
             unique_polygons.append(p)
 
     # Resize the image for display purposes
@@ -173,8 +180,11 @@ def get_walls(img):
         cv2.rectangle(output_img, (p[0], p[1]), (p[2], p[3]), (0, 0, 255), 2)  # Draw rectangles in red
         cv2.circle(output_img, (p[0], p[1]), 5, (255, 0, 0), -1)
         cv2.circle(output_img, (p[2], p[3]), 5, (0, 255, 0), -1)
+
+
+    cv2.imwrite("/agent/polygons.jpg", output_img)
         
-    np.array(unique_polygons).tofile("polygons.txt")
+    np.array(unique_polygons).tofile("/agent/polygons.txt")
     output_path = "walls.jpg"
     cv2.imwrite(output_path, output_img)
 

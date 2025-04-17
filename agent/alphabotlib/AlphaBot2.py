@@ -17,6 +17,7 @@ class AlphaBot2(object):
 		self.PB  = 50
 		self.speed = 1.0
 		self.turn_speed = 1.0
+		self.gotoing = False
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
@@ -99,8 +100,10 @@ class AlphaBot2(object):
 		# 		print("Turn right")
 		# 	else:
 
+		# self.setPWMA(7.8)
+		# self.setPWMB(7.3)
 		self.setPWMA(7.8)
-		self.setPWMB(7.3)
+		self.setPWMB(7.8)
 		self.forward()
 		time.sleep(duration)
 		self.stop()
@@ -141,6 +144,10 @@ class AlphaBot2(object):
 
 
 	def goto(self, x1, y1, x2, y2, curr_angle, max_time=0.25):
+		if self.gotoing == True:
+			return 0
+
+		self.gotoing = True
 		self.stop()
 		sleep_time = 0.1
 		angle = self.get_angle_between(x1, y1, x2, y2)
@@ -182,6 +189,8 @@ class AlphaBot2(object):
 		self.stop()
 
 		# time.sleep(0.3)
+
+		self.gotoing = False
 
 		return angle
 
