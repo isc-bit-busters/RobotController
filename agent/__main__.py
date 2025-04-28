@@ -165,6 +165,7 @@ class AlphaBotAgent(Agent):
                 cv2.circle(img, (int(next_waypoint[0]), int(next_waypoint[2])), 5, (255, 0, 0), -1)
                 cv2.circle(img, (int(last_waypoint[0]), int(last_waypoint[2])), 5, (255, 0, 255), -1)
 
+                # Get the position of the robot on the "ground" by applying the homography transformation
                 trans = self.agent.trans
                 real_robot_pos = trans((pos1["x"], pos1["y"]))
                 real_robot_pos = (real_robot_pos[0], real_robot_pos[1])
@@ -255,6 +256,12 @@ class AlphaBotAgent(Agent):
                 cv2.imwrite("/agent/navmesh_image.jpg", img0)
 
                 walls = get_walls(img0)
+
+                # Apply the homography transformation to the walls
+                walls = [[tx1, ty1, tx2, ty2] 
+                        for x1, y1, x2, y2 in walls 
+                        for tx1, ty1 in [trans((x1, y1))]
+                        for tx2, ty2 in [trans((x2, y2))]]
 
                 logger.info(f"[Step 0] Detected walls: {walls}")
                 before_time = time.time()
