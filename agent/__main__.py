@@ -21,7 +21,7 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco, get_walls, load_points, build_transformation
+from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation
 from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
@@ -255,7 +255,7 @@ class AlphaBotAgent(Agent):
 
                 cv2.imwrite("/agent/navmesh_image.jpg", img0)
 
-                walls = get_walls(img0)
+                walls = detect_walls(img0)
 
                 # Apply the homography transformation to the walls
                 walls = [[tx1, ty1, tx2, ty2] 
