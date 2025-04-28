@@ -171,11 +171,10 @@ def detectAruco(image):
 
     return arucos_positions
 
-
-def get_walls(img):
+def get_walls(img_path):
     # Load the image
     polygons = []
-    # img = cv2.imread(img_path)
+    img = cv2.imread(img_path)
     # Load calibration data from .npz file
     # calibration_data = np.load("calibration_data.npz")
     # mtx = calibration_data['mtx']
@@ -184,7 +183,7 @@ def get_walls(img):
     # # Undistort the image using the calibration data
     # img = cv2.undistort(img, mtx, dist, None, mtx)
     if img is None:
-        print(f"Error: Could not open or read image at {img}")
+        print(f"Error: Could not open or read image at {img_path}")
         return []
     print(img.shape)
     # Convert the image to HSV color space
@@ -284,6 +283,9 @@ def get_walls(img):
     return unique_polygons
 
 
+# get_walls("img/maze1.jpeg")
+
+
 def test_get_walls(img_path):
     img = cv2.imread(img_path)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -372,12 +374,33 @@ def test_get_walls(img_path):
     cv2.destroyAllWindows()
 
 
-def detect_walls(img, color_range):
+def detect_walls(img):
+    # Load the image
+    # add a filter  to the image
+    # Load calibration data from .npz file
+    # calibration_data = np.load("camera_calibration.npz")
+    # mtx = calibration_data['camera_matrix'].copy()
+    # dist = calibration_data['dist_coeffs'].copy()
+    # h = img.shape[0]
+    # w = img.shape[1]
+    # print(h, w)
+    # newcameramtx, roi = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
+    # # undistort the image
+    # # Undistort the image using the calibration data
+    # img = cv2.undistort(img, mtx, dist, None, newcameramtx)
+
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 100])
+    upper_red2 = np.array([180, 255, 255])
+
     # Convert the image to HSV color space
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask = cv2.bitwise_or(mask1, mask2)
 
     # Create a mask for the specified color range
-    mask = cv2.inRange(hsv, color_range[0], color_range[1])
 
     # Find contours in the mask
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -423,76 +446,12 @@ def detect_walls(img, color_range):
         cv2.circle(output_img, (p[2], p[3]), 5, (0, 255, 0), -1)
 
     # show output image
-    cv2.imshow("Output Image", output_img)
-    cv2.imshow("Image", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('Output Image', output_img)
+    # cv2.imshow('Image', img)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
     return polygons
-
-
-# fonction to detect a color in the image
-def detect_color(img_path, color_range):
-    # Load the image
-    img = cv2.imread(img_path)
-    if img is None:
-        print(f"Error: Could not open or read image at {img_path}")
-        return []
-
-    # Convert the image to HSV color space
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-    # Create a mask for the specified color range
-    mask = cv2.inRange(hsv, color_range[0], color_range[1])
-
-    # Find contours in the mask
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-    # Filter contours based on area
-    min_area = 200  # Adjust this value as needed
-    filtered_contours = [
-        contour for contour in contours if cv2.contourArea(contour) > min_area
-    ]
-    # filter mask to remove small areas
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
-
-    # Draw rectangles around the detected areas
-    for contour in filtered_contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        cv2.rectangle(
-            img, (x, y), (x + w, y + h), (0, 255, 0), 2
-        )  # Draw rectangles in green
-    # detect lines in the image
-    lines = cv2.HoughLinesP(
-        mask, 1, np.pi / 180, threshold=120, minLineLength=100, maxLineGap=1.5
-    )
-    if lines is not None:
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-            cv2.line(img, (x1, y1), (x2, y2), (255, 0, 0), 2)  # Draw lines in blue
-    # Display the results
-    cv2.imshow("Mask", cv2.resize(mask, (640, 480)))
-    cv2.imshow("Detected Color", img)
-    cv2.imshow("Original Image", cv2.resize(cv2.imread(img_path), (640, 480)))
-    # resize the image for display purposes
-    img = cv2.resize(img, (640, 480))
-    cv2.imshow("Detected Color", img)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-
-
-def get_red_walls(img):
-    red_range1 = (np.array([0, 100, 100]), np.array([10, 255, 255]))
-    red_range3 = (np.array([150, 50, 50]), np.array([180, 255, 255]))
-
-    # Test the function with different red color ranges
-    polygons = detect_walls(img, red_range1)
-    if len(polygons)<20:
-        polygons = detect_walls(img, red_range3)
-
-    return polygons
-
 
 
 if __name__ == "__main__":
