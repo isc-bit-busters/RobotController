@@ -21,7 +21,7 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation
+# from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation
 from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
@@ -43,6 +43,7 @@ class AlphaBotAgent(Agent):
         self.alphabot = AlphaBot2()
         self.robot_name = name
         self.other_agent = "mael" if name == "gerald" else "gerald"
+        self.camera_api = CameraHandler()
 
     class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
@@ -374,13 +375,34 @@ class AlphaBotAgent(Agent):
             # pong_behavior = self.PongBehaviour()
             # self.add_behaviour(pong_behavior)
             
+    class SendImageToDashBehaviour(CyclicBehaviour):
+        async def run(self):
+            xmpp_username="receiverClient"
+            xmpp_server="prosody"
+            msg = Message(to=f"{xmpp_username}@{xmpp_server}")
+            msg.set_metadata("robot_id", self.agent.robot_name)
+            msg.set_metadata("type", "image")
+
+            image=self.agent.camera_api.capture_image()
+            _, buffer = cv2.imencode(".jpg", image)
+            encoded_image = base64.b64encode(buffer).decode("utf-8")
+
+            msg.body = encoded_image
+            try:
+                await self.send(msg)
+                logger.info(f"Message sent to {msg.to}")
+            except Exception as e:
+                logger.info(f"Failed to send message: {e}")
+            await asyncio.sleep(2)
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
+        self.camera_api.initialize_camera()
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
         logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
        
+        self.add_behaviour(self.SendImageToDashBehaviour())
         self.add_behaviour(self.InitBehaviour())
         logger.info("[Agent] Behaviors added, setup complete.") 
 
@@ -399,28 +421,29 @@ async def main():
         return 
     
 ##Test camera api
-    camera_api = CameraHandler()
-    camera_api.initialize_camera()
+    # camera_api = CameraHandler()
+    # camera_api.initialize_camera()
    
-    # Vision
-    session, input_name = load_model('/agent/yolov5n.onnx')
-    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
+    # # Vision
+    # session, input_name = load_model('/agent/yolov5n.onnx')
+    # camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
  
-    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
-    image = camera_api.capture_image()
+    # # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
+    # image = camera_api.capture_image()
+    # camera_api.close()
    
-    #Detection
-    results = detect_cubes(
-        image=image,
-        session=session,
-        input_name=input_name,
-        camera_matrix=camera_matrix,
-        dist_coeffs=dist_coeffs,
-        focal_length=focal_length
-    )
+    # #Detection
+    # results = detect_cubes(
+    #     image=image,
+    #     session=session,
+    #     input_name=input_name,
+    #     camera_matrix=camera_matrix,
+    #     dist_coeffs=dist_coeffs,
+    #     focal_length=focal_length
+    # )
  
-    # Résultats
-    print(results)
+    # # Résultats
+    # print(results)
     
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
