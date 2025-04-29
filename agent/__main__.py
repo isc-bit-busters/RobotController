@@ -61,7 +61,7 @@ class AlphaBotAgent(Agent):
     class ListenToImageBehaviour(CyclicBehaviour):
         async def run(self):
             robot_id = 7
-            goal_id = 5
+            goal_id = 0
 
             logger.info("[Behavior] Listening for image messages...")
             msg = await self.receive(timeout=1)
@@ -165,10 +165,9 @@ class AlphaBotAgent(Agent):
                 cv2.circle(img, (int(next_waypoint[0]), int(next_waypoint[2])), 5, (255, 0, 0), -1)
                 cv2.circle(img, (int(last_waypoint[0]), int(last_waypoint[2])), 5, (255, 0, 255), -1)
 
-                # Get the position of the robot on the "ground" by applying the homography transformation
                 trans = self.agent.trans
                 real_robot_pos = trans((pos1["x"], pos1["y"]))
-                real_robot_pos = (real_robot_pos[0], real_robot_pos[1])
+                real_robot_pos = (int(real_robot_pos[0]), int(real_robot_pos[1]))
 
                 print(f"Real robot position: {real_robot_pos}")
 
@@ -225,8 +224,8 @@ class AlphaBotAgent(Agent):
             img = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
 
             if name is not None:
-                cv2.imwrite(f"{name}.jpg", img)
-
+                print('SAVING IMAGE KSJDKAJSDKJSK')
+                cv2.imwrite(f"/agent/{name}.jpg", img)
             return img
 
         async def run(self):
@@ -253,20 +252,26 @@ class AlphaBotAgent(Agent):
                 logger.info("[Step 0] Requesting initial image...")
                 img0 = await self.request_image("0_initial")
 
-                cv2.imwrite("/agent/navmesh_image.jpg", img0)
+                cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
 
                 walls = detect_walls(img0)
-
-                # Apply the homography transformation to the walls
-                walls = [[tx1, ty1, tx2, ty2] 
-                        for x1, y1, x2, y2 in walls 
-                        for tx1, ty1 in [trans((x1, y1))]
-                        for tx2, ty2 in [trans((x2, y2))]]
 
                 logger.info(f"[Step 0] Detected walls: {walls}")
                 before_time = time.time()
                 logger.info("[Step 0] Generating NavMesh...")
                 vertices, polygons = generate_navmesh(walls)
+                self.agent.navmesh = (vertices, polygons)
+            
+                nav_img = img0.copy()
+                navmesh_overlay = np.zeros_like(nav_img)
+                for polygon in self.agent.navmesh[1]:
+                    pts = np.array([[self.agent.navmesh[0][i][0] * navmesh_scale, self.agent.navmesh[0][i][2] * navmesh_scale] for i in polygon], np.int32)
+                    cv2.fillPoly(navmesh_overlay, [pts], (60, 190, 60), lineType=cv2.LINE_AA)
+                    cv2.polylines(nav_img, [pts], isClosed=True, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+
+                cv2.addWeighted(navmesh_overlay, 0.2, nav_img, 1, 0, nav_img)
+
+                cv2.imwrite("/agent/navmesh_image.jpg", nav_img)
 
                 with open("/agent/navmesh.txt", "w") as f:
                     f.write(f"{vertices}\n")
