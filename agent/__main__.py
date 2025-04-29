@@ -224,7 +224,7 @@ class AlphaBotAgent(Agent):
             img = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
 
             if name is not None:
-                print('SAVING IMAGE KSJDKAJSDKJSK')
+                print(f"SAVING IMAGE {name}.jpg")
                 cv2.imwrite(f"/agent/{name}.jpg", img)
             return img
 
@@ -255,6 +255,22 @@ class AlphaBotAgent(Agent):
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
 
                 walls = detect_walls(img0)
+                
+                # Apply the homography transformation to the walls
+                walls = [[tx1, ty1, tx2, ty2] 
+                        for x1, y1, x2, y2 in walls 
+                        for tx1, ty1 in [trans((x1, y1))]
+                        for tx2, ty2 in [trans((x2, y2))]]
+
+                walls_img = img0.copy()
+                for p in walls:
+                    cv2.rectangle(
+                        walls_img, (int(p[0]), int(p[1])), (int(p[2]), int(p[3])), (0, 0, 255), 2
+                    )  # Draw rectangles in red
+                    cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
+                    cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
+
+                cv2.imwrite("/agent/walls_image.jpg", walls_img)
 
                 logger.info(f"[Step 0] Detected walls: {walls}")
                 before_time = time.time()
@@ -262,7 +278,7 @@ class AlphaBotAgent(Agent):
                 vertices, polygons = generate_navmesh(walls)
                 self.agent.navmesh = (vertices, polygons)
             
-                nav_img = img0.copy()
+                nav_img = walls_img.copy()
                 navmesh_overlay = np.zeros_like(nav_img)
                 for polygon in self.agent.navmesh[1]:
                     pts = np.array([[self.agent.navmesh[0][i][0] * navmesh_scale, self.agent.navmesh[0][i][2] * navmesh_scale] for i in polygon], np.int32)
