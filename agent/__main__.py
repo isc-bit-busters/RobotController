@@ -395,6 +395,67 @@ class AlphaBotAgent(Agent):
                 logger.info(f"Failed to send message: {e}")
             await asyncio.sleep(2)
 
+    class CubeDetectionBehaviour(CyclicBehaviour):
+        def __init__(self):
+            super().__init__()
+            from agent.alphabotlib.PCA9685 import PCA9685
+            self.pwm = PCA9685(debug=False)
+            self.pwm.set_pwm_freq(50)
+            # Calibration settings for SG90 servos
+            self.x_min_pulse = 700
+            self.x_max_pulse = 2000
+            self.y_min_pulse = 1200
+            self.y_max_pulse = 1700
+
+            # Load model and calibration once
+            from agent.vision import load_model, load_calibration
+            self.session, self.input_name = load_model('/agent/yolov5n.onnx')
+            self.camera_matrix, self.dist_coeffs, self.focal_length = load_calibration('/agent/camera_calibration.npz')
+
+        async def run(self):
+            logger.info("[CubeDetection] Starting cube detection cycle...")
+
+            # X-axis angles (horizontal sweep)
+            x_angles = [-30, 0, 30]
+            # Y-axis angles (vertical sweep)
+            y_angles = [-30, 0, 30]
+
+            for x_angle in x_angles:
+                self.pwm.set_servo_angle(0, x_angle, min_pulse=self.x_min_pulse, max_pulse=self.x_max_pulse)
+                await asyncio.sleep(0.3)
+                for y_angle in y_angles:
+                    self.pwm.set_servo_angle(1, y_angle, min_pulse=self.y_min_pulse, max_pulse=self.y_max_pulse)
+                    await asyncio.sleep(0.3)
+
+                    logger.info(f"[CubeDetection] Capturing image at X: {x_angle}°, Y: {y_angle}°...")
+                    
+                    image = self.agent.camera_api.capture_image()
+                    
+                    # Run YOLO detection
+                    from agent.vision import detect_cubes
+                    results = detect_cubes(
+                        image=image,
+                        session=self.session,
+                        input_name=self.input_name,
+                        camera_matrix=self.camera_matrix,
+                        dist_coeffs=self.dist_coeffs,
+                        focal_length=self.focal_length
+                    )
+
+                    logger.info(f"[CubeDetection] Detection results at X: {x_angle}, Y: {y_angle}: {results}")
+
+                    # Send results to the dashboard
+                    msg = Message(to="receiverClient@prosody")
+                    msg.set_metadata("robot_id", self.agent.robot_name)
+                    msg.set_metadata("type", "cube_detection")
+
+                    msg.body = str(results) + f" at X: {x_angle}, Y: {y_angle}"
+                    try:
+                        await self.send(msg)
+                        logger.info(f"[CubeDetection] Message sent to {msg.to}")
+                    except Exception as e:
+                        logger.info(f"[CubeDetection] Failed to send message: {e}")
+
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         self.camera_api.initialize_camera()
@@ -403,6 +464,7 @@ class AlphaBotAgent(Agent):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
        
         self.add_behaviour(self.SendImageToDashBehaviour())
+        self.add_behaviour(self.CubeDetectionBehaviour())
         self.add_behaviour(self.InitBehaviour())
         logger.info("[Agent] Behaviors added, setup complete.") 
 
@@ -421,29 +483,30 @@ async def main():
         return 
     
 ##Test camera api
-    # camera_api = CameraHandler()
-    # camera_api.initialize_camera()
+    camera_api = CameraHandler()
+    camera_api.initialize_camera()
    
-    # # Vision
-    # session, input_name = load_model('/agent/yolov5n.onnx')
-    # camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
+    # Vision
+    from agent.vision import load_model, load_calibration, detect_cubes
+    session, input_name = load_model('/agent/yolov5n.onnx')
+    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
  
-    # # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
-    # image = camera_api.capture_image()
-    # camera_api.close()
+    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
+    image = camera_api.capture_image()
+    camera_api.close()
    
-    # #Detection
-    # results = detect_cubes(
-    #     image=image,
-    #     session=session,
-    #     input_name=input_name,
-    #     camera_matrix=camera_matrix,
-    #     dist_coeffs=dist_coeffs,
-    #     focal_length=focal_length
-    # )
+    #Detection
+    results = detect_cubes(
+        image=image,
+        session=session,
+        input_name=input_name,
+        camera_matrix=camera_matrix,
+        dist_coeffs=dist_coeffs,
+        focal_length=focal_length
+    )
  
-    # # Résultats
-    # print(results)
+    # Résultats
+    print(results)
     
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
