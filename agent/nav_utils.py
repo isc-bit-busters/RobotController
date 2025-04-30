@@ -85,8 +85,11 @@ def find_path(start, end, vertices, polygons):
     end = numpy.array(end) / SCALE
     pathfinder = pf.PathFinder(vertices, polygons)
 
-    start = pathfinder.sample(start)
-    end = pathfinder.sample(end)
+    sampled_start = pathfinder.sample(start)
+    sampled_end = pathfinder.sample(end)
+
+    start = sampled_start if sampled_start is not None else start
+    end = sampled_end if sampled_end is not None else end
 
     print(f"Start: {start} - {init_start}")
     print(f"End: {end}")
