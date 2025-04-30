@@ -85,27 +85,27 @@ class AlphaBot2(object):
 
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
-		GPIO.setup(DR,GPIO.IN,GPIO.PUD_UP)
-		GPIO.setup(DL,GPIO.IN,GPIO.PUD_UP)
+		GPIO.setup(DR, GPIO.IN, GPIO.PUD_UP)
+		GPIO.setup(DL, GPIO.IN, GPIO.PUD_UP)
 
-		# for i in range(int(dist)):
-		# 	DR_status = GPIO.input(DR)
-		# 	DL_status = GPIO.input(DL)
-		# 	print(f"DL: {DL_status}, DR: {DR_status}")
-		# 	if(DL_status == 0):
-		# 		self.turn(90)
-		# 		print("Turn left")
-		# 	elif(DR_status == 0):
-		# 		self.turn(-90)
-		# 		print("Turn right")
-		# 	else:
+		start_time = time.time()
+		while time.time() - start_time < duration:
+			DR_status = GPIO.input(DR)
+			DL_status = GPIO.input(DL)
+			logger.info(f"DL: {DL_status}, DR: {DR_status}")
 
-		# self.setPWMA(7.8)
-		# self.setPWMB(7.3)
-		self.setPWMA(7.8)
-		self.setPWMB(7.8)
-		self.forward()
-		time.sleep(duration)
+			if DL_status == 0:
+				logger.info("Obstacle detected on the left. Turning right.")
+				self.turn_left(float(self.get_rotation_time(30)))  # Turn right for 90 degrees
+			elif DR_status == 0:
+				logger.info("Obstacle detected on the right. Turning left.")
+				self.turn_right(float(self.get_rotation_time(30)))  # Turn left for 90 degrees
+			else:
+				self.setPWMA(7.8)
+				self.setPWMB(7.8)
+				self.forward()
+				time.sleep(0.1)  # Move forward for a short time
+
 		self.stop()
 
 
