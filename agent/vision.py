@@ -82,9 +82,25 @@ def detect_cubes(image, session, input_name, camera_matrix, dist_coeffs, focal_l
         if image is None:
             raise FileNotFoundError(f"❌ Image not found: {image}")
 
+    # Save original image for debugging
+    cv2.imwrite("/agent/debug_original.jpg", image)
+
     # Undistortion
-    image = cv2.undistort(image, camera_matrix, dist_coeffs)
-    img_input, original_shape, resized_shape = preprocess_image(image, IMG_SIZE)
+    image_undistorted = cv2.undistort(image, camera_matrix, dist_coeffs)
+
+    # Save undistorted image for debugging
+    cv2.imwrite("/agent/debug_undistorted.jpg", image_undistorted)
+
+    # Preprocess image
+    img_input, original_shape, resized_shape = preprocess_image(image_undistorted, IMG_SIZE)
+
+    # Save resized image for debugging
+    resized_bgr = cv2.resize(image_undistorted, (IMG_SIZE, IMG_SIZE))  # already in BGR
+    cv2.imwrite("/agent/debug_resized.jpg", resized_bgr)
+
+    # Run inference
     outputs = session.run(None, {input_name: img_input})
+
+    # Postprocess and return results
     results = postprocess(outputs, original_shape, resized_shape, focal_length)
     return results
