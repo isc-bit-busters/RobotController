@@ -104,8 +104,6 @@ def detectAruco(image):
 
     # image = cv2.imread(path)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.resize(gray, (640, 480))
-    image = cv2.resize(image, (640, 480))
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
     parameters = cv2.aruco.DetectorParameters()
@@ -389,6 +387,15 @@ def detect_walls(img):
     # # Undistort the image using the calibration data
     # img = cv2.undistort(img, mtx, dist, None, newcameramtx)
 
+    original_size = img.shape
+    print("shape", img.shape)
+    new_size = (1920, 1080)
+    scale_factor = (
+        original_size[1] / new_size[0], original_size[0] / new_size[1]
+    )
+
+    img = cv2.resize(img, new_size)
+
     lower_red1 = np.array([0, 100, 100])
     upper_red1 = np.array([10, 255, 255])
     lower_red2 = np.array([160, 100, 100])
@@ -437,6 +444,19 @@ def detect_walls(img):
         if polygons[i][1] > polygons[i][3]:
             polygons[i][1], polygons[i][3] = polygons[i][3], polygons[i][1]
 
+    new_polys = []
+    for p in polygons:
+        if not any(
+            abs(p[0] - up[0]) < 100
+            and abs(p[1] - up[1]) < 100
+            and abs(p[2] - up[2]) < 100
+            and abs(p[3] - up[3]) < 100
+            for up in new_polys 
+        ):
+            new_polys.append(p)
+
+    polygons = new_polys
+
     # draw polygons on output image
     for p in polygons:
         cv2.rectangle(
@@ -445,11 +465,25 @@ def detect_walls(img):
         cv2.circle(output_img, (p[0], p[1]), 5, (255, 0, 0), -1)
         cv2.circle(output_img, (p[2], p[3]), 5, (0, 255, 0), -1)
 
+    cv2.imwrite("/agent/walls1.jpg", img)
+    cv2.imwrite("/agent/walls2.jpg", output_img)
+
     # show output image
     # cv2.imshow('Output Image', output_img)
     # cv2.imshow('Image', img)
     # cv2.waitKey(0)
     # cv2.destroyAllWindows()
+
+    # Resize polygons by the scale factor
+    polygons = [
+        [
+            int(p[0] * scale_factor[0]),
+            int(p[1] * scale_factor[1]),
+            int(p[2] * scale_factor[0]),
+            int(p[3] * scale_factor[1]),
+        ]
+        for p in polygons
+    ]
 
     return polygons
 

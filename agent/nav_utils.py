@@ -70,9 +70,9 @@ def generate_navmesh(polygons):
     )
 
     baker.bake(
-        agent_radius=0.5,   # TODO: unhardcode this
-        cell_size=0.0333,   # TODO: unhardcode this
-        verts_per_poly=3
+        agent_radius=0.45,   # TODO: unhardcode this
+        cell_size=0.04,   # TODO: unhardcode this
+        # verts_per_poly=3
     )
 
     baker.save_to_text("/agent/navmesh_raw.txt")
@@ -85,8 +85,11 @@ def find_path(start, end, vertices, polygons):
     end = numpy.array(end) / SCALE
     pathfinder = pf.PathFinder(vertices, polygons)
 
-    start = pathfinder.sample(start)
-    end = pathfinder.sample(end)
+    sampled_start = pathfinder.sample(start)
+    sampled_end = pathfinder.sample(end)
+
+    start = sampled_start if sampled_start is not None else start
+    end = sampled_end if sampled_end is not None else end
 
     print(f"Start: {start} - {init_start}")
     print(f"End: {end}")

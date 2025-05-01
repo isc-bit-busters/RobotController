@@ -57,7 +57,7 @@ RUN pip install .
 
 
 # Clone and build libcamera from Raspberry Pi fork
-RUN git clone https://github.com/raspberrypi/libcamera.git /opt/libcamera
+RUN git clone --branch v0.4.0+rpt20250213 https://github.com/raspberrypi/libcamera.git /opt/libcamera
 WORKDIR /opt/libcamera
 
 # Build and install libcamera
