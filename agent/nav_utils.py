@@ -70,9 +70,9 @@ def generate_navmesh(polygons):
     )
 
     baker.bake(
-        agent_radius=0.5,   # TODO: unhardcode this
-        cell_size=0.0333,   # TODO: unhardcode this
-        verts_per_poly=3
+        agent_radius=0.45,   # TODO: unhardcode this
+        cell_size=0.04,   # TODO: unhardcode this
+        # verts_per_poly=3
     )
 
     baker.save_to_text("/agent/navmesh_raw.txt")

@@ -96,10 +96,10 @@ class AlphaBot2(object):
 
 			if DL_status == 0:
 				logger.info("Obstacle detected on the left. Turning right.")
-				self.turn_left(float(self.get_rotation_time(30)))  # Turn right for 90 degrees
+				self.turn_left(float(self.get_rotation_time(45)))  # Turn right for 90 degrees
 			elif DR_status == 0:
 				logger.info("Obstacle detected on the right. Turning left.")
-				self.turn_right(float(self.get_rotation_time(30)))  # Turn left for 90 degrees
+				self.turn_right(float(self.get_rotation_time(45)))  # Turn left for 90 degrees
 			else:
 				self.setPWMA(7.8)
 				self.setPWMB(7.8)
