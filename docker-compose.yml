@@ -20,7 +20,7 @@ services:
     volumes:
       - ./agent:/agent
       - /run/udev:/run/udev:ro
-      - /sys:/
+      - /sys:/sys
       - ./images:/images
     extra_hosts:
       - "prosody:192.168.88.253"
