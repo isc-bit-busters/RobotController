@@ -430,6 +430,10 @@ class AlphaBotAgent(Agent):
                     logger.info(f"[CubeDetection] Capturing image at X: {x_angle}°, Y: {y_angle}°...")
                     
                     image = self.agent.camera_api.capture_image()
+
+                    os.makedirs("/images", exist_ok=True)
+                    time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    self.agent.camera_api.save_image(image, f"/images/cam_{x_angle}_{y_angle}_{time}.jpg")
                     
                     # Run YOLO detection
                     from agent.vision import detect_cubes
@@ -481,32 +485,6 @@ async def main():
     if not xmpp_username:
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
-    
-##Test camera api
-    camera_api = CameraHandler()
-    camera_api.initialize_camera()
-   
-    # Vision
-    from agent.vision import load_model, load_calibration, detect_cubes
-    session, input_name = load_model('/agent/yolov5n.onnx')
-    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
- 
-    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
-    image = camera_api.capture_image()
-    camera_api.close()
-   
-    #Detection
-    results = detect_cubes(
-        image=image,
-        session=session,
-        input_name=input_name,
-        camera_matrix=camera_matrix,
-        dist_coeffs=dist_coeffs,
-        focal_length=focal_length
-    )
- 
-    # Résultats
-    print(results)
     
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")

@@ -43,6 +43,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Python packages required by libcamera's build system
 RUN pip install meson ninja jinja2 pyyaml ply
 
+# Install smbus for I2C support and control servos
+RUN apt update && apt install -y python3-smbus i2c-tools
 
 # Install dependencies for pykms
 RUN apt install -y libkms++-dev libfmt-dev libdrm-dev
@@ -78,6 +80,8 @@ WORKDIR /opt/picamera2
 RUN pip install .
 
 RUN pip install opencv-python
+
+RUN pip install smbus
 
 ENV PYTHONPATH=/usr/local/lib/aarch64-linux-gnu/python3.9/site-packages:$PYTHONPATH
 
