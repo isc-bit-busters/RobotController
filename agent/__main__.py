@@ -15,6 +15,7 @@ import asyncio
 import numpy as np
 import cv2
 import uuid
+from PIL import Image
 
 
 from spade.agent import Agent
@@ -495,26 +496,16 @@ async def main():
     camera_api = CameraHandler()
     camera_api.initialize_camera()
    
-    # Vision
-    session, input_name = load_model('/agent/yolov5n.onnx')
-    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
- 
-    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
-    image = camera_api.capture_image()
-   
-    #Detection
-    results = detect_cubes(
-        image=image,
-        session=session,
-        input_name=input_name,
-        camera_matrix=camera_matrix,
-        dist_coeffs=dist_coeffs,
-        focal_length=focal_length
-    )
- 
-    # Résultats
-    print(results)
-    
+    bgr_image = camera_api.capture_image()
+    rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(rgb_image)
+
+    obstacle_zones = estimate_depth_map(pil_image)
+
+    print("Obstacle detection by zone:")
+    for zone, present in obstacle_zones.items():
+        print(f"{zone.capitalize()}: {'🚫 Obstacle' if present else '✅ Clear'}")
+        
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
 
