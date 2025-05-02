@@ -21,7 +21,7 @@ from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
-from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation
+from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation, detect_cubes_camera_agent
 from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
@@ -44,6 +44,30 @@ class AlphaBotAgent(Agent):
         self.alphabot = AlphaBot2()
         self.robot_name = name
         self.other_agent = "mael" if name == "gerald" else "gerald"
+        self.camera_handler = None  
+        self.vision_session = None
+        self.vision_input_name = None
+        self.camera_matrix = None
+        self.dist_coeffs = None
+        self.focal_length = None
+
+    async def setup(self):
+        logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
+        logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
+        
+        # Initialize camera and vision components once
+        logger.info("[Agent] Initializing camera and vision components...")
+        self.camera_handler = CameraHandler()
+        self.camera_handler.initialize_camera()
+        
+        # Load vision model and calibration
+        self.vision_session, self.vision_input_name = load_model('/agent/yolov5n.onnx')
+        self.camera_matrix, self.dist_coeffs, self.focal_length = load_calibration('/agent/camera_calibration.npz')
+        
+        logger.info("[Agent] Camera and vision components initialized.")
+        
+        self.add_behaviour(self.InitBehaviour())
+        logger.info("[Agent] Behaviors added, setup complete.")
 
     class RequestImageBehaviour(TimeoutBehaviour):
         async def run(self):
@@ -54,7 +78,6 @@ class AlphaBotAgent(Agent):
             msg.metadata = {"thread": thread_id}
             now = datetime.datetime.now()
             await self.send(msg)
-
 
             robot_id = 7
             goal_id = 0
@@ -79,14 +102,6 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Behavior] Received image message from {msg.sender}")
                 time_human = datetime.datetime.now().strftime("%H:%M:%S.%f")
                 logger.info(f"[Behavior] Message received at {time_human}")
-
-                # if str(msg.sender).startswith("camera_agent@"):
-                #     # forward the message to the other robot
-                #     logger.info(f"[Behavior] Forwarding image to {self.agent.other_agent}...")
-                #     forward_msg = Message(to=f"{self.agent.other_agent}@prosody")
-                #     forward_msg.body = msg.body
-                #     await self.send(forward_msg)
-                #     logger.info(f"[Behavior] Image forwarded to {self.agent.other_agent}.")
 
                 encoded_img = msg.body.split("image ")[1].strip()
 
@@ -150,7 +165,17 @@ class AlphaBotAgent(Agent):
                     )
                     next_waypoint_id += 1
                     dist_to_skip -= dist_to_next_waypoint
-
+                #do interpolation of points too close to each other
+                if dist_to_next_waypoint < 25:
+                    logger.info("[Behaviour] Next waypoint too close, interpolating")
+                    next_waypoint = (
+                        (next_waypoint[0] + ground_robot_pos[0]) / 2,
+                        next_waypoint[1],
+                        (next_waypoint[2] + ground_robot_pos[1]) / 2,
+                    )
+                    dist_to_next_waypoint = math.sqrt(
+                        (next_waypoint[0] - ground_robot_pos[0]) ** 2 + (next_waypoint[2] - ground_robot_pos[1]) ** 2
+                    )
                 time_to_move = self.agent.alphabot.get_move_time(dist_to_next_waypoint)
 
                 logger.info(f"[Behavior] Next waypoint: #{next_waypoint_id} {next_waypoint}")
@@ -216,7 +241,6 @@ class AlphaBotAgent(Agent):
 
                 #endregion 
 
-
                 if self.agent.alphabot.gotoing:
                     logger.info("[Behavior] Already going to a waypoint, skipping this message.")
                 else:
@@ -228,19 +252,42 @@ class AlphaBotAgent(Agent):
             request_image_behavior = self.agent.RequestImageBehaviour(start_at=now + delta)
             self.agent.add_behaviour(request_image_behavior)
     
-    class TestBehaviour(TimeoutBehaviour):
-        async def run(self):
-            logger.info("[Test] Running test behavior...")
-            await asyncio.sleep(5)
-            logger.info("[Test] Test behavior finished.")
-           
- 
-            now = datetime.datetime.now()
-            delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
-            request_image_behavior = self.agent.Test(start_at=now + delta)
-            self.agent.add_behaviour(request_image_behavior)
-
+    # class TestBehaviour(TimeoutBehaviour):
+    #     async def run(self):
+    #         logger.info("[Test] Running test behavior...")
             
+    #         try:
+    #             # Capture image using the pre-initialized camera handler
+    #             image = self.agent.camera_handler.capture_image()
+                
+    #             if image is not None:
+    #                 # Process the image with vision components
+    #                 results = detect_cubes(
+    #                     image=image,
+    #                     session=self.agent.vision_session,
+    #                     input_name=self.agent.vision_input_name,
+    #                     camera_matrix=self.agent.camera_matrix,
+    #                     dist_coeffs=self.agent.dist_coeffs,
+    #                     focal_length=self.agent.focal_length
+    #                 )
+                    
+    #                 logger.info(f"[Test] Vision detection results: {results}")
+                    
+    #                 # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    #                 # filename = f"/agent/test_image_{timestamp}.jpg"
+    #                 # cv2.imwrite(filename, image)
+    #                 # logger.info(f"[Test] Saved test image to {filename}")
+    #             else:
+    #                 logger.warning("[Test] Failed to capture image from camera")
+                
+    #         except Exception as e:
+    #             logger.error(f"[Test] Error in test behavior: {str(e)}", exc_info=True)
+            
+    #         # Schedule the next run
+    #         now = datetime.datetime.now()
+    #         delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
+    #         next_test = self.agent.TestBehaviour(start_at=now + delta)
+    #         self.agent.add_behaviour(next_test)
 
     class InitBehaviour(OneShotBehaviour):
         async def request_image(self, name=None):
@@ -306,7 +353,7 @@ class AlphaBotAgent(Agent):
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
 
                 walls = detect_walls(img0)
-
+                cubes = detect_cubes_camera_agent(img0)
                 wall_scale_factor = 0.8
 
                 # Scale the walls to make them longer
@@ -332,7 +379,11 @@ class AlphaBotAgent(Agent):
                         for x1, y1, x2, y2 in walls 
                         for tx1, ty1 in [trans((x1, y1))]
                         for tx2, ty2 in [trans((x2, y2))]]
-
+                #Apply the homography transformation to the cubes
+                cubes = [[tx1, ty1, tx2, ty2]
+                        for x1, y1, x2, y2 in cubes
+                        for tx1, ty1 in [trans((x1, y1))]
+                        for tx2, ty2 in [trans((x2, y2))]]
                 walls_img = img0.copy()
                 for p in walls:
                     cv2.rectangle(
@@ -340,12 +391,19 @@ class AlphaBotAgent(Agent):
                     )  # Draw rectangles in red
                     cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
                     cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
-
+                # draw the cubes in blue
+                for p in cubes:
+                    cv2.rectangle(
+                        walls_img, (int(p[0]), int(p[1])), (int(p[2]), int(p[3])), (255, 0, 0), 2
+                    )
+                    cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
+                    cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
                 cv2.imwrite("/agent/walls_image.jpg", walls_img)
 
                 logger.info(f"[Step 0] Detected walls: {walls}")
                 before_time = time.time()
-                logger.info("[Step 0] Generating NavMesh...")
+                logger.info("[Step 0] Generating NavMesh...")                
+                walls += cubes
                 vertices, polygons = generate_navmesh(walls)
                 self.agent.navmesh = (vertices, polygons)
             
@@ -439,11 +497,7 @@ class AlphaBotAgent(Agent):
             
             logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
 
-
-
             await asyncio.sleep(2)
-
-            
 
         async def on_end(self):
             logger.info("[Behavior] MoveAndMeasureBehaviour ended.")
@@ -457,63 +511,23 @@ class AlphaBotAgent(Agent):
             request_image_behavior = self.agent.RequestImageBehaviour(start_at=staggered_start_time)
             self.agent.add_behaviour(request_image_behavior)
 
-            test = self.agent.TestBehaviour(start_at=staggered_start_time)
-            self.agent.add_behaviour(test)
-
-
-            # ping_behavior = self.PingBehaviour(to=f"{self.other_agent}@prosody")
-            # self.add_behaviour(ping_behavior)
-            
-            # pong_behavior = self.PongBehaviour()
-            # self.add_behaviour(pong_behavior)
-            
-
-    async def setup(self):
-        logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
-        logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
-        
-        logger.info(f"[Agent] AlphaBotAgent {self.jid} setup starting...")
-       
-        self.add_behaviour(self.InitBehaviour())
-        logger.info("[Agent] Behaviors added, setup complete.") 
-
+            # test = self.agent.TestBehaviour(start_at=staggered_start_time)
+            # self.agent.add_behaviour(test)
 
     async def stop(self):
         logger.info(f"[Agent] Stopping AlphaBotAgent {self.jid}")
+        if self.camera_handler:
+            self.camera_handler.close_camera()
+            logger.info("[Agent] Camera handler closed.")
         await super().stop()
         logger.info("[Agent] Stopped.")
 
-# === MAIN ===
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
     xmpp_username = os.environ.get("XMPP_USERNAME")
     if not xmpp_username:
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
-    
-##Test camera api
-    camera_api = CameraHandler()
-    camera_api.initialize_camera()
-   
-    # Vision
-    session, input_name = load_model('/agent/yolov5n.onnx')
-    camera_matrix, dist_coeffs, focal_length = load_calibration('/agent/camera_calibration.npz')
- 
-    # Capture d’image depuis camera_api (déjà fait plus haut dans ton script)
-    image = camera_api.capture_image()
-   
-    #Detection
-    results = detect_cubes(
-        image=image,
-        session=session,
-        input_name=input_name,
-        camera_matrix=camera_matrix,
-        dist_coeffs=dist_coeffs,
-        focal_length=focal_length
-    )
- 
-    # Résultats
-    print(results)
     
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
