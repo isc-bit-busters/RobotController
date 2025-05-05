@@ -15,6 +15,7 @@ import asyncio
 import numpy as np
 import cv2
 import uuid
+from PIL import Image
 
 
 from spade.agent import Agent
@@ -582,6 +583,25 @@ async def main():
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
     
+    # === Test depth estimation before starting the agent ===
+    try:
+        camera_api = CameraHandler()
+        camera_api.initialize_camera()
+       
+        bgr_image = camera_api.capture_image()
+        rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+        pil_image = Image.fromarray(rgb_image)
+
+        obstacle_zones = estimate_depth_map(pil_image, visualize=True)
+
+        print("Obstacle detection by zone:")
+        for zone, present in obstacle_zones.items():
+            print(f"{zone.capitalize()}: {'🚫 Obstacle' if present else '✅ Clear'}")
+
+    except Exception as e:
+        logger.error(f"❌ Depth estimation error: {e}", exc_info=True)
+        return
+
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
 
@@ -593,7 +613,7 @@ async def main():
             jid=xmpp_jid, 
             password=xmpp_password,
             verify_security=False,
-            name = xmpp_username
+            name=xmpp_username
         )
         
         logger.info("Agent created, attempting to start...")
@@ -608,6 +628,7 @@ async def main():
         await agent.stop()
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
+
 
 if __name__ == "__main__":
     try:
