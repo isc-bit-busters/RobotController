@@ -62,10 +62,6 @@ class AlphaBotAgent(Agent):
         self.camera_handler = CameraHandler()
         self.camera_handler.initialize_camera()
         
-        # Load vision model and calibration
-        self.vision_session, self.vision_input_name = load_model('/agent/yolov5n.onnx')
-        self.camera_matrix, self.dist_coeffs, self.focal_length = load_calibration('/agent/camera_calibration.npz')
-        
         logger.info("[Agent] Camera and vision components initialized.")
         
         self.add_behaviour(self.InitBehaviour())
