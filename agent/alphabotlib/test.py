@@ -521,7 +521,7 @@ def detect_cubes_camera_agent(img):
     filtered_contours = [contour for contour in contours if min_area < cv2.contourArea(contour) < max_area]
     # Draw all contours except the first
     final_contours = []
-    for contour in filtered_contours[10:]:  # Skip the first contour
+    for contour in filtered_contours:  # Skip the first contour
         epsilon = 0.08 * cv2.arcLength(contour, True)
         approx = cv2.approxPolyDP(contour, epsilon, True)
 
