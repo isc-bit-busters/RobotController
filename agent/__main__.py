@@ -50,6 +50,7 @@ class AlphaBotAgent(Agent):
         self.camera_matrix = None
         self.dist_coeffs = None
         self.focal_length = None
+        self.running = True  # Add this flag
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -82,7 +83,6 @@ class AlphaBotAgent(Agent):
             robot_id = 7
             goal_id = 0
 
-            logger.info("[Behavior] Listening for image messages...")
 
             msg = await self.receive(timeout=10)
 
@@ -165,17 +165,7 @@ class AlphaBotAgent(Agent):
                     )
                     next_waypoint_id += 1
                     dist_to_skip -= dist_to_next_waypoint
-                #do interpolation of points too close to each other
-                if dist_to_next_waypoint < 25:
-                    logger.info("[Behaviour] Next waypoint too close, interpolating")
-                    next_waypoint = (
-                        (next_waypoint[0] + ground_robot_pos[0]) / 2,
-                        next_waypoint[1],
-                        (next_waypoint[2] + ground_robot_pos[1]) / 2,
-                    )
-                    dist_to_next_waypoint = math.sqrt(
-                        (next_waypoint[0] - ground_robot_pos[0]) ** 2 + (next_waypoint[2] - ground_robot_pos[1]) ** 2
-                    )
+              
                 time_to_move = self.agent.alphabot.get_move_time(dist_to_next_waypoint)
 
                 logger.info(f"[Behavior] Next waypoint: #{next_waypoint_id} {next_waypoint}")
@@ -244,50 +234,82 @@ class AlphaBotAgent(Agent):
                 if self.agent.alphabot.gotoing:
                     logger.info("[Behavior] Already going to a waypoint, skipping this message.")
                 else:
-                    self.agent.alphabot.goto(ground_robot_pos[0], ground_robot_pos[1], next_waypoint[0], next_waypoint[2], robot_pos["angle"], max_time=2)
+                    self.agent.alphabot.goto(ground_robot_pos[0], ground_robot_pos[1], next_waypoint[0], next_waypoint[2], robot_pos["angle"], max_time=3)
 
             await process()
 
+            if self.agent.running:
+                delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
+                request_image_behavior = self.agent.RequestImageBehaviour(start_at=datetime.datetime.now() + delta)
+                self.agent.add_behaviour(request_image_behavior)
+    class StartStopBehaviour(TimeoutBehaviour):
+        async def run(self):
+            logger.info("[StartStop] Waiting for start/stop commands...")
+            msg = await self.receive(timeout=1)  # Wait for a message
+
+            if msg:
+                command = msg.body.lower()
+                if command == "start":
+                    logger.info("[StartStop] Received start command. Starting robot...")
+                    self.agent.running = True  # Set the running flag to True
+
+                    # Remove existing RequestImageBehaviour instances
+                    for behavior in self.agent.behaviours:
+                        if isinstance(behavior, self.agent.RequestImageBehaviour):
+                            self.agent.remove_behaviour(behavior)
+                            logger.info("[StartStop] Removed existing RequestImageBehaviour.")
+
+                    # Add a new RequestImageBehaviour
+                    request_image_behavior = self.agent.RequestImageBehaviour(start_at=datetime.datetime.now()+IMAGE_INTERVAL_MS)
+                    self.agent.add_behaviour(request_image_behavior)
+
+                elif command == "stop":
+                    logger.info("[StartStop] Received stop command. Stopping robot...")
+                    self.agent.running = False  # Set the running flag to False
+
+                    # Remove all RequestImageBehaviour instances
+                    for behavior in self.agent.behaviours:
+                        if isinstance(behavior, self.agent.RequestImageBehaviour):
+                            self.agent.remove_behaviour(behavior)
+                            logger.info("[StartStop] Stopped RequestImageBehaviour.")
+
+                    self.agent.alphabot.stop()
+    class TestBehaviour(TimeoutBehaviour):
+        async def run(self):
+            logger.info("[Test] Running test behavior...")
+            
+            try:
+                # Capture image using the pre-initialized camera handler
+                image = self.agent.camera_handler.capture_image()
+                
+                if image is not None:
+                    # Process the image with vision components
+                    results = detect_cubes(
+                        image=image,
+                        session=self.agent.vision_session,
+                        input_name=self.agent.vision_input_name,
+                        camera_matrix=self.agent.camera_matrix,
+                        dist_coeffs=self.agent.dist_coeffs,
+                        focal_length=self.agent.focal_length
+                    )
+                    
+                    logger.info(f"[Test] Vision detection results: {results}")
+                    
+                    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    # filename = f"/agent/test_image_{timestamp}.jpg"
+                    # cv2.imwrite(filename, image)
+                    # logger.info(f"[Test] Saved test image to {filename}")
+                else:
+                    logger.warning("[Test] Failed to capture image from camera")
+                
+            except Exception as e:
+                logger.error(f"[Test] Error in test behavior: {str(e)}", exc_info=True)
+            
+            # Schedule the next run
+            now = datetime.datetime.now()
             delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
-            request_image_behavior = self.agent.RequestImageBehaviour(start_at=now + delta)
-            self.agent.add_behaviour(request_image_behavior)
-    
-    # class TestBehaviour(TimeoutBehaviour):
-    #     async def run(self):
-    #         logger.info("[Test] Running test behavior...")
-            
-    #         try:
-    #             # Capture image using the pre-initialized camera handler
-    #             image = self.agent.camera_handler.capture_image()
-                
-    #             if image is not None:
-    #                 # Process the image with vision components
-    #                 results = detect_cubes(
-    #                     image=image,
-    #                     session=self.agent.vision_session,
-    #                     input_name=self.agent.vision_input_name,
-    #                     camera_matrix=self.agent.camera_matrix,
-    #                     dist_coeffs=self.agent.dist_coeffs,
-    #                     focal_length=self.agent.focal_length
-    #                 )
-                    
-    #                 logger.info(f"[Test] Vision detection results: {results}")
-                    
-    #                 # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    #                 # filename = f"/agent/test_image_{timestamp}.jpg"
-    #                 # cv2.imwrite(filename, image)
-    #                 # logger.info(f"[Test] Saved test image to {filename}")
-    #             else:
-    #                 logger.warning("[Test] Failed to capture image from camera")
-                
-    #         except Exception as e:
-    #             logger.error(f"[Test] Error in test behavior: {str(e)}", exc_info=True)
-            
-    #         # Schedule the next run
-    #         now = datetime.datetime.now()
-    #         delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
-    #         next_test = self.agent.TestBehaviour(start_at=now + delta)
-    #         self.agent.add_behaviour(next_test)
+            next_test = self.agent.TestBehaviour(start_at=now + delta)
+            self.agent.add_behaviour(next_test)
 
     class InitBehaviour(OneShotBehaviour):
         async def request_image(self, name=None):
@@ -320,7 +342,7 @@ class AlphaBotAgent(Agent):
 
             encoded_img = reply.body.split("image ")[1].strip()
             img = cv2.imdecode(np.frombuffer(base64.b64decode(encoded_img), np.uint8), cv2.IMREAD_COLOR)
-
+           
             if name is not None:
                 print(f"SAVING IMAGE {name}.jpg")
                 cv2.imwrite(f"/agent/{name}.jpg", img)
@@ -437,6 +459,19 @@ class AlphaBotAgent(Agent):
                 # === STEP 1: Take the first image ===
                 logger.info("[Step 1] Requesting initial image...")
                 img1 = await self.request_image("1_initial")
+                while True and img1 is not None: 
+                    msg = await self.receive(timeout=1)  # Check for a message every second
+                    if msg:
+                        print(f"msg: {msg.body}")
+                #check specific content of msg
+                    if msg and msg.body.startswith("validate"):
+                        logger.info(f"[Step 1.5] Received message from {msg.sender}: {msg.body}")
+                        break
+                    elif msg and msg.body.startswith("take_picture"): 
+                        # request another img and wait the validation button 
+                        logger.info(f"[Step 1.5] Received message from {msg.sender}: {msg.body}")
+                        img1 = await self.request_image("1_initial")
+                        continue
                 arucos1 = detectAruco(img1)
                 print(f"Detected Arucos: {arucos1}")
                 if robot_id not in arucos1:
@@ -450,7 +485,16 @@ class AlphaBotAgent(Agent):
             
 
             await asyncio.sleep(2)
+            logger.info("[Step 1.5] Waiting for a message from another agent...")
 
+            while True: 
+                msg = await self.receive(timeout=1)  # Check for a message every second
+                if msg and msg.body.startswith("calibrate"):
+                    logger.info(f"[Step 1.5] Received message from {msg.sender}: {msg.body}")
+                    break
+
+            # Wait for a message from the other agent
+            
             t = 2  # seconds
             # === STEP 2: Move the robot ===
             logger.info("[Step 2] Moving robot forward...")
@@ -489,13 +533,18 @@ class AlphaBotAgent(Agent):
                 logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
             
             pos3 = arucos3[robot_id]
-            logger.info(f"[Step 5] Robot new position after rotation: {pos3}")
+            logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")
 
             rot_angle = pos3["angle"] - pos2["angle"]
             self.agent.alphabot.setTurnSpeed(rot_angle / rot_t)
             logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
             
             logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
+            while True:
+                msg = await self.receive(timeout=1)  # Check for a message every second
+                if msg and msg.body.startswith("start"):
+                    break   
+            logger.info("[Behavior] Listening for image messages...")
 
             await asyncio.sleep(2)
 
@@ -513,6 +562,9 @@ class AlphaBotAgent(Agent):
 
             # test = self.agent.TestBehaviour(start_at=staggered_start_time)
             # self.agent.add_behaviour(test)
+            
+            # startandstop = self.agent.StartStopBehaviour(start_at=staggered_start_time)
+            # self.agent.add_behaviour(startandstop)
 
     async def stop(self):
         logger.info(f"[Agent] Stopping AlphaBotAgent {self.jid}")
@@ -525,6 +577,7 @@ class AlphaBotAgent(Agent):
 async def main():
     xmpp_domain = os.environ.get("XMPP_DOMAIN", "prosody")
     xmpp_username = os.environ.get("XMPP_USERNAME")
+
     if not xmpp_username:
         logger.error("XMPP_USERNAME environment variable is not set.")
         return 
