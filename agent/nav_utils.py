@@ -142,58 +142,121 @@ def find_path_two_bots(start1, end1, start2, end2, vertices, polygons):
     return paths
 
 def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
-    def path_dist(path):
-        dist = 0
-        for i in range(len(path) - 1):
-            p1 = path[i]
-            p2 = path[i + 1]
-
-            segment_length = numpy.linalg.norm(p2 - p1)
-            dist += segment_length
-
-        return dist
-
+    # Pad the shorter path with its last point to match lengths
     if len(path1) < len(path2):
         path1 = path1 + [path1[-1]] * (len(path2) - len(path1))
     elif len(path2) < len(path1):
         path2 = path2 + [path2[-1]] * (len(path1) - len(path2))
-
-    dist_path1 = path_dist(path1) 
-    dist_path2 = path_dist(path2) 
+    
+    # Pre-compute path segments and lengths once
+    segments1 = []
+    segments2 = []
+    segment_lengths1 = []
+    segment_lengths2 = []
+    
+    # Compute segments and their lengths for path1
+    for i in range(len(path1) - 1):
+        p1, p2 = path1[i], path1[i + 1]
+        segments1.append((p1, p2))
+        segment_lengths1.append(numpy.linalg.norm(p2 - p1))
+    
+    # Compute segments and their lengths for path2
+    for i in range(len(path2) - 1):
+        p1, p2 = path2[i], path2[i + 1]
+        segments2.append((p1, p2))
+        segment_lengths2.append(numpy.linalg.norm(p2 - p1))
+    
+    # Calculate total path distances
+    dist_path1 = sum(segment_lengths1)
+    dist_path2 = sum(segment_lengths2)
     max_dist = max(dist_path1, dist_path2)
-
-    def point_on_path(path, dist):
-        dist_left = dist
-        for i in range(len(path) - 1):
-            p1 = path[i]
-            p2 = path[i + 1]
-
-            segment_length = numpy.linalg.norm(p2 - p1)
-
-            if dist_left < segment_length:
-                return p1 + (p2 - p1) * (dist_left / segment_length)
-
-            dist_left -= segment_length
-
-        return path[-1]
-
-
-    steps = int(max_dist / step_dist)
-    for i in range(steps):
-        dist = i * step_dist
-        point1 = point_on_path(path1, dist)
-        point2 = point_on_path(path2, dist)
-
-        # print(f"At step {i}: r1={point1}, r2={point2}")
-
-        dist = numpy.linalg.norm(point1 - point2)
-
-        # print(f"At step {i}: r1={point1}, r2={point2} - dist={dist}")
-
-        if dist < robot_radius:
-            # print(f"Collision detected at step {i}: r1={point1}, r2={point2}, dist={dist}")
-            return point1, point2, i * step_dist
+    
+    # Create lookup tables for quick path location access
+    path1_lookup = [(0, 0)]  # (segment_idx, accumulated_distance)
+    accumulated = 0
+    for i, length in enumerate(segment_lengths1):
+        accumulated += length
+        path1_lookup.append((i+1, accumulated))
+    
+    path2_lookup = [(0, 0)]
+    accumulated = 0
+    for i, length in enumerate(segment_lengths2):
+        accumulated += length
+        path2_lookup.append((i+1, accumulated))
+    
+    def optimized_point_on_path(path, segments, segment_lengths, path_lookup, dist):
+        # Binary search to find the right segment
+        left, right = 0, len(path_lookup) - 1
+        while left < right:
+            mid = (left + right) // 2
+            if path_lookup[mid][1] < dist:
+                left = mid + 1
+            else:
+                right = mid
         
+        segment_idx = path_lookup[max(0, left - 1)][0]
+        
+        # If we're at the end of the path, return the last point
+        if segment_idx >= len(segments):
+            return path[-1]
+        
+        # Calculate how far along the segment to place the point
+        dist_into_segment = dist - path_lookup[segment_idx][1]
+        p1, p2 = segments[segment_idx]
+        segment_length = segment_lengths[segment_idx]
+        
+        if segment_length == 0:  # Handle zero-length segments
+            return p1
+        
+        # Linear interpolation
+        proportion = dist_into_segment / segment_length
+        return p1 + (p2 - p1) * proportion
+
+    # Use vectorized operations and early stopping
+    squared_radius = robot_radius * robot_radius  # Avoid sqrt in distance comparisons
+    steps = int(max_dist / step_dist)
+    
+    # Check collision every n steps first for early detection of potential collisions
+    check_interval = max(1, min(10, steps // 20))  # Adjust based on expected path complexity
+    
+    # First pass: Check at intervals to quickly identify potential collision regions
+    for i in range(0, steps, check_interval):
+        dist = i * step_dist
+        point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
+        point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
+        
+        # Use squared distance to avoid sqrt
+        squared_dist = numpy.sum((point1 - point2) ** 2)
+        
+        if squared_dist < squared_radius:
+            # Potential collision found, now check more precisely in this region
+            start_step = max(0, i - check_interval)
+            end_step = min(steps, i + check_interval)
+            
+            for j in range(start_step, end_step):
+                precise_dist = j * step_dist
+                precise_point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, precise_dist)
+                precise_point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, precise_dist)
+                
+                precise_squared_dist = numpy.sum((precise_point1 - precise_point2) ** 2)
+                
+                if precise_squared_dist < squared_radius:
+                    return precise_point1, precise_point2, j * step_dist
+    
+    # If no collision found after interval checks, do a more comprehensive scan
+    for i in range(steps):
+        if i % check_interval == 0:  # Skip steps we already checked
+            continue
+            
+        dist = i * step_dist
+        point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
+        point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
+        
+        squared_dist = numpy.sum((point1 - point2) ** 2)
+        
+        if squared_dist < squared_radius:
+            return point1, point2, i * step_dist
+    
     return None
 
 
@@ -279,8 +342,8 @@ if __name__ == "__main__":
     )
 
     paths = find_path_two_bots(
-        start1=(200, 0, 270), 
-        end1=(800, 0, 370),
+        start1=(900, 0, 200), 
+        end1=(350, 0, 350),
         start2=(800, 0, 370),
         end2=(200, 0, 270), 
         vertices=vertices,
