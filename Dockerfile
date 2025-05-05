@@ -80,6 +80,8 @@ RUN pip install .
 RUN pip install opencv-python torch transformers
 
 ENV PYTHONPATH=/usr/local/lib/aarch64-linux-gnu/python3.9/site-packages:$PYTHONPATH
+ENV LD_LIBRARY_PATH=/usr/local/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+
 
 # App code
 WORKDIR /agent

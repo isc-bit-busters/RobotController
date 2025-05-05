@@ -588,7 +588,7 @@ async def main():
         rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
         pil_image = Image.fromarray(rgb_image)
 
-        obstacle_zones = estimate_depth_map(pil_image, visualize=True)
+        obstacle_zones = estimate_depth_map(pil_image)
 
         print("Obstacle detection by zone:")
         for zone, present in obstacle_zones.items():
