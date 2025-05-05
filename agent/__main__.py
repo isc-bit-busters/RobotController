@@ -82,12 +82,12 @@ class AlphaBotAgent(Agent):
 
             arucos_ids = {
                 "gerald": {
-                    "robot": 7,
-                    "goal": 0
-                },
-                "mael": {
                     "robot": 8,
                     "goal": 1
+                },
+                "mael": {
+                    "robot": 7,
+                    "goal": 0
                 }
             }
 
