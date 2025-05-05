@@ -1,8 +1,8 @@
 import base64
 import datetime
 import math
-from agent.vision import *
-from agent.camera_api import CameraHandler
+# from agent.vision import *
+# from agent.camera_api import CameraHandler
 from spade.agent import Agent
 from spade.behaviour import TimeoutBehaviour, OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
@@ -45,13 +45,13 @@ class AlphaBotAgent(Agent):
         self.alphabot = AlphaBot2()
         self.robot_name = name
         self.other_agent = "mael" if name == "gerald" else "gerald"
-        self.camera_handler = None  
-        self.vision_session = None
-        self.vision_input_name = None
-        self.camera_matrix = None
-        self.dist_coeffs = None
-        self.focal_length = None
-        self.running = True  # Add this flag
+        # self.camera_handler = None  
+        # self.vision_session = None
+        # self.vision_input_name = None
+        # self.camera_matrix = None
+        # self.dist_coeffs = None
+        # self.focal_length = None
+        # self.running = True  # Add this flag
 
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -59,12 +59,12 @@ class AlphaBotAgent(Agent):
         
         # Initialize camera and vision components once
         logger.info("[Agent] Initializing camera and vision components...")
-        self.camera_handler = CameraHandler()
-        self.camera_handler.initialize_camera()
+        # self.camera_handler = CameraHandler()
+        # self.camera_handler.initialize_camera()
         
         # Load vision model and calibration
-        self.vision_session, self.vision_input_name = load_model('/agent/yolov5n.onnx')
-        self.camera_matrix, self.dist_coeffs, self.focal_length = load_calibration('/agent/camera_calibration.npz')
+        # self.vision_session, self.vision_input_name = load_model('/agent/yolov5n.onnx')
+        # self.camera_matrix, self.dist_coeffs, self.focal_length = load_calibration('/agent/camera_calibration.npz')
         
         logger.info("[Agent] Camera and vision components initialized.")
         
@@ -275,42 +275,42 @@ class AlphaBotAgent(Agent):
                             logger.info("[StartStop] Stopped RequestImageBehaviour.")
 
                     self.agent.alphabot.stop()
-    class TestBehaviour(TimeoutBehaviour):
-        async def run(self):
-            logger.info("[Test] Running test behavior...")
+    # class TestBehaviour(TimeoutBehaviour):
+    #     async def run(self):
+    #         logger.info("[Test] Running test behavior...")
             
-            try:
-                # Capture image using the pre-initialized camera handler
-                image = self.agent.camera_handler.capture_image()
+    #         try:
+    #             # Capture image using the pre-initialized camera handler
+    #             image = self.agent.camera_handler.capture_image()
                 
-                if image is not None:
-                    # Process the image with vision components
-                    results = detect_cubes(
-                        image=image,
-                        session=self.agent.vision_session,
-                        input_name=self.agent.vision_input_name,
-                        camera_matrix=self.agent.camera_matrix,
-                        dist_coeffs=self.agent.dist_coeffs,
-                        focal_length=self.agent.focal_length
-                    )
+    #             if image is not None:
+    #                 # Process the image with vision components
+    #                 results = detect_cubes(
+    #                     image=image,
+    #                     session=self.agent.vision_session,
+    #                     input_name=self.agent.vision_input_name,
+    #                     camera_matrix=self.agent.camera_matrix,
+    #                     dist_coeffs=self.agent.dist_coeffs,
+    #                     focal_length=self.agent.focal_length
+    #                 )
                     
-                    logger.info(f"[Test] Vision detection results: {results}")
+    #                 logger.info(f"[Test] Vision detection results: {results}")
                     
-                    # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    # filename = f"/agent/test_image_{timestamp}.jpg"
-                    # cv2.imwrite(filename, image)
-                    # logger.info(f"[Test] Saved test image to {filename}")
-                else:
-                    logger.warning("[Test] Failed to capture image from camera")
+    #                 # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    #                 # filename = f"/agent/test_image_{timestamp}.jpg"
+    #                 # cv2.imwrite(filename, image)
+    #                 # logger.info(f"[Test] Saved test image to {filename}")
+    #             else:
+    #                 logger.warning("[Test] Failed to capture image from camera")
                 
-            except Exception as e:
-                logger.error(f"[Test] Error in test behavior: {str(e)}", exc_info=True)
+    #         except Exception as e:
+    #             logger.error(f"[Test] Error in test behavior: {str(e)}", exc_info=True)
             
-            # Schedule the next run
-            now = datetime.datetime.now()
-            delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
-            next_test = self.agent.TestBehaviour(start_at=now + delta)
-            self.agent.add_behaviour(next_test)
+    #         # Schedule the next run
+    #         now = datetime.datetime.now()
+    #         delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
+    #         next_test = self.agent.TestBehaviour(start_at=now + delta)
+    #         self.agent.add_behaviour(next_test)
 
     class InitBehaviour(OneShotBehaviour):
         async def request_image(self, name=None):
@@ -372,11 +372,22 @@ class AlphaBotAgent(Agent):
 
                 logger.info("[Step 0] Requesting initial image...")
                 img0 = await self.request_image("0_initial")
+                while True: 
+                    msg = await self.receive(timeout=1)
+                    if msg and msg.body.startswith("validate"):
+                        logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
+                        break
+                    elif msg and msg.body.startswith("take_picture"):
+                        # request another img and wait the validation button 
+                        logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
+                        img0 = await self.request_image("0_initial")
+                        continue
 
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
-
+                img0 = cv2.resize(img0, (1024, 576), img0)
                 walls = detect_walls(img0)
                 cubes = detect_cubes_camera_agent(img0)
+                print(len(cubes))
                 wall_scale_factor = 0.8
 
                 # Scale the walls to make them longer
@@ -569,9 +580,9 @@ class AlphaBotAgent(Agent):
 
     async def stop(self):
         logger.info(f"[Agent] Stopping AlphaBotAgent {self.jid}")
-        if self.camera_handler:
-            self.camera_handler.close_camera()
-            logger.info("[Agent] Camera handler closed.")
+        # if self.camera_handler:
+        #     self.camera_handler.close_camera()
+        #     logger.info("[Agent] Camera handler closed.")
         await super().stop()
         logger.info("[Agent] Stopped.")
 
@@ -584,23 +595,23 @@ async def main():
         return 
     
     # === Test depth estimation before starting the agent ===
-    try:
-        camera_api = CameraHandler()
-        camera_api.initialize_camera()
+    # try:
+        # camera_api = CameraHandler()
+        # camera_api.initialize_camera()
        
-        bgr_image = camera_api.capture_image()
-        rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
-        pil_image = Image.fromarray(rgb_image)
+        # bgr_image = camera_api.capture_image()
+        # rgb_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB)
+        # pil_image = Image.fromarray(rgb_image)
 
-        obstacle_zones = estimate_depth_map(pil_image, visualize=True)
+        # obstacle_zones = estimate_depth_map(pil_image, visualize=True)
 
-        print("Obstacle detection by zone:")
-        for zone, present in obstacle_zones.items():
-            print(f"{zone.capitalize()}: {'🚫 Obstacle' if present else '✅ Clear'}")
+        # print("Obstacle detection by zone:")
+        # for zone, present in obstacle_zones.items():
+        #     print(f"{zone.capitalize()}: {'🚫 Obstacle' if present else '✅ Clear'}")
 
-    except Exception as e:
-        logger.error(f"❌ Depth estimation error: {e}", exc_info=True)
-        return
+    # except Exception as e:
+    #     logger.error(f"❌ Depth estimation error: {e}", exc_info=True)
+    #     return
 
     xmpp_jid = f"{xmpp_username}@{xmpp_domain}"
     xmpp_password = os.environ.get("XMPP_PASSWORD", "top_secret")
