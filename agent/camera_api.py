@@ -8,30 +8,34 @@ class CameraHandler:
     def __init__(self, resolution=(640, 480)):
         self.resolution = resolution
         self.picam2 = None
-
+        
     def initialize_camera(self):
         try:
             self.picam2 = Picamera2()
-
-            camera_info = self.picam2.global_camera_info()
-            if not camera_info:
-                raise RuntimeError("Aucune caméra détectée !")
-
-            print(f"Caméra(s) détectée(s) : {camera_info}")
-
-            try:
-                self.picam2.stop()
-            except Exception as e:
-                print(f"Aucune instance active à arrêter : {e}")
-
-            self.picam2.configure(self.picam2.create_still_configuration(main={"size": self.resolution}))
+            
+            # Sensor mode selection (prioritize 1080p)
+            config = self.picam2.create_video_configuration(
+                main={
+                    "size": (1920, 1080),  # Optimal for OV5647
+                    "format": "BGR888",     # OpenCV-compatible
+                },
+                controls={
+                    "FrameRate": 30,        # Target 30fps
+                    "AwbEnable": True,      # Auto white balance  
+                    "AnalogueGain": 1.0,    # Reduce noise
+                },
+                queue=False,                # Reduce latency
+                buffer_count=4,             # Balance performance/memory
+            )
+            
+            self.picam2.configure(config)
             self.picam2.start()
-            time.sleep(1)
-
-        except RuntimeError as e:
-            print(f"Erreur d'accès à la caméra : {e}")
+            time.sleep(2)  # Warm-up for AWB/exposure
+            
+        except Exception as e:
+            print(f"Camera error: {e}")
             raise
-
+        
     def capture_image(self, convert_rgb=True):
         if self.picam2 is None:
             raise RuntimeError("Caméra non initialisée.")
