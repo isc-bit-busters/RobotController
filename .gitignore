@@ -6,7 +6,16 @@ __pycache__
 agent/navmesh.txt
 agent/detected_lines.jpg
 agent/navmesh_image.jpg
+agent/navmesh_image_base.jpg
 agent/navmesh_raw.txt
 agent/path_image_*.jpg
 agent/polygons.jpg
 agent/polygons.txt
+agent/test_image_*.jpg
+agent/walls1.jpg
+agent/walls2.jpg
+agent/walls_image.jpg
+agent/0_initial.jpg
+agent/1_initial.jpg
+agent/2_after_move.jpg
+agent/3_after_rotation.jpg
