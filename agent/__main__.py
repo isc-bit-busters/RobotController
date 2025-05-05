@@ -116,6 +116,7 @@ class AlphaBotAgent(Agent):
 
                 if robot_id not in arucos:
                     logger.warning("[Behaviour] ⚠ Robot ID not found in image.")
+                    self.agent.alphabot.advance(0.2)
                     return 
 
                 if goal_id not in arucos:
@@ -488,6 +489,7 @@ class AlphaBotAgent(Agent):
                 print(f"Detected Arucos: {arucos1}")
                 if robot_id not in arucos1:
                     logger.warning("[Step 1] ⚠ Robot ID not found in initial image.")
+                    self.agent.alphabot.advance(0.2)
                     continue
 
                 pos1 = arucos1[robot_id]
@@ -519,6 +521,7 @@ class AlphaBotAgent(Agent):
             arucos2 = detectAruco(img2)
             if robot_id not in arucos2:
                 logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
+                self.agent.alphabot.advance(0.2)
 
             pos2 = arucos2[robot_id]
             logger.info(f"[Step 3] Robot new position: {pos2}")
@@ -543,6 +546,7 @@ class AlphaBotAgent(Agent):
             arucos3 = detectAruco(img3)
             if robot_id not in arucos3:
                 logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
+                self.agent.alphabot.advance(0.2)
             
             pos3 = arucos3[robot_id]
             logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")
