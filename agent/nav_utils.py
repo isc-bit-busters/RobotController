@@ -141,7 +141,7 @@ def find_path_two_bots(start1, end1, start2, end2, vertices, polygons):
 
     return paths
 
-def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
+def find_collision(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_REAL):
     # Pad the shorter path with its last point to match lengths
     if len(path1) < len(path2):
         path1 = path1 + [path1[-1]] * (len(path2) - len(path1))
@@ -184,7 +184,7 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
         accumulated += length
         path2_lookup.append((i+1, accumulated))
     
-    def optimized_point_on_path(path, segments, segment_lengths, path_lookup, dist):
+    def point_on_path(path, segments, segment_lengths, path_lookup, dist):
         # Binary search to find the right segment
         left, right = 0, len(path_lookup) - 1
         while left < right:
@@ -217,13 +217,13 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
     steps = int(max_dist / step_dist)
     
     # Check collision every n steps first for early detection of potential collisions
-    check_interval = max(1, min(10, steps // 20))  # Adjust based on expected path complexity
+    check_interval = max(1, min(10, steps // 20))
     
     # First pass: Check at intervals to quickly identify potential collision regions
     for i in range(0, steps, check_interval):
         dist = i * step_dist
-        point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
-        point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
+        point1 = point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
+        point2 = point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
         
         # Use squared distance to avoid sqrt
         squared_dist = numpy.sum((point1 - point2) ** 2)
@@ -235,8 +235,8 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
             
             for j in range(start_step, end_step):
                 precise_dist = j * step_dist
-                precise_point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, precise_dist)
-                precise_point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, precise_dist)
+                precise_point1 = point_on_path(path1, segments1, segment_lengths1, path1_lookup, precise_dist)
+                precise_point2 = point_on_path(path2, segments2, segment_lengths2, path2_lookup, precise_dist)
                 
                 precise_squared_dist = numpy.sum((precise_point1 - precise_point2) ** 2)
                 
@@ -249,8 +249,8 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
             continue
             
         dist = i * step_dist
-        point1 = optimized_point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
-        point2 = optimized_point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
+        point1 = point_on_path(path1, segments1, segment_lengths1, path1_lookup, dist)
+        point2 = point_on_path(path2, segments2, segment_lengths2, path2_lookup, dist)
         
         squared_dist = numpy.sum((point1 - point2) ** 2)
         
@@ -260,7 +260,7 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=2):
     return None
 
 
-def find_waiting_point(path1, path2, step_dist=0.1, robot_radius=2):
+def find_waiting_point(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_REAL):
     """
     Find a point on path1 where the robot can wait for path2 to pass.
     """
@@ -304,7 +304,7 @@ def find_waiting_point(path1, path2, step_dist=0.1, robot_radius=2):
         collides = find_collision(shortened_path1, path2, step_dist, robot_radius)
         if collides is None:
             # print(f"Waiting point found at distance {dist} between {shortened_path1[-1]} and {point2}")
-            return shortened_path1[-1], point2, dist
+            return shortened_path1, point2, dist
         
 
     # print("No waiting point found")

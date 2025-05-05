@@ -23,7 +23,7 @@ from spade.behaviour import OneShotBehaviour, CyclicBehaviour
 from spade.message import Message
 from agent.alphabotlib.AlphaBot2 import AlphaBot2
 from agent.alphabotlib.test import detectAruco, detect_walls, load_points, build_transformation, detect_cubes_camera_agent
-from agent.nav_utils import generate_navmesh, find_path, SCALE as navmesh_scale
+from agent.nav_utils import find_collision, find_path_two_bots, find_waiting_point, generate_navmesh, find_path, SCALE as navmesh_scale
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -80,6 +80,17 @@ class AlphaBotAgent(Agent):
             now = datetime.datetime.now()
             await self.send(msg)
 
+            arucos_ids = {
+                "gerald": {
+                    "robot": 7,
+                    "goal": 0
+                },
+                "mael": {
+                    "robot": 8,
+                    "goal": 1
+                }
+            }
+
             robot_id = 7
             goal_id = 0
 
@@ -114,26 +125,50 @@ class AlphaBotAgent(Agent):
                 arucos = detectAruco(img)
                 print(f"Detected Arucos: {arucos}")
 
-                if robot_id not in arucos:
-                    logger.warning("[Behaviour] ⚠ Robot ID not found in image.")
-                    return 
-
-                if goal_id not in arucos:
-                    logger.warning("[Behaviour] ⚠ Goal ID not found in image.")
-                    return 
+                if arucos_ids[self.agent.robot_name]["robot"] not in arucos:
+                    logger.warning("[Behavior] ⚠ Robot ID not found in image.")
+                    return
+                
+                if arucos_ids[self.agent.robot_name]["goal"] not in arucos:
+                    logger.warning("[Behavior] ⚠ Goal ID not found in image.")
+                    return
+                
+                if arucos_ids[self.agent.other_agent]["robot"] not in arucos:
+                    logger.warning("[Behavior] ⚠ Other robot ID not found in image.")
+                    return
+                
+                if arucos_ids[self.agent.other_agent]["goal"] not in arucos:
+                    logger.warning("[Behavior] ⚠ Other agent goal ID not found in image.")
+                    return
 
                 # Get the robot and goal arucos positions on the image
-                robot_pos = arucos[robot_id]
-                goal_pos = arucos[goal_id]
+                robot_pos = arucos[arucos_ids[self.agent.robot_name]["robot"]]
+                goal_pos = arucos[arucos_ids[self.agent.robot_name]["goal"]]
+
+                other_robot_pos = arucos[arucos_ids[self.agent.other_agent]["robot"]]
+                other_goal_pos = arucos[arucos_ids[self.agent.other_agent]["goal"]]
 
                 # Apply the homography transformation to the robot to get its "ground" position
                 trans = self.agent.trans
                 ground_robot_pos = trans((robot_pos["x"], robot_pos["y"]))
                 ground_robot_pos = (int(ground_robot_pos[0]), int(ground_robot_pos[1]))
+
+                ground_other_robot_pos = trans((other_robot_pos["x"], other_robot_pos["y"]))
+                ground_other_robot_pos = (int(ground_other_robot_pos[0]), int(ground_other_robot_pos[1]))
                 
                 logger.info(f"[Behaviour] going from {ground_robot_pos} to {goal_pos}")
 
-                path = find_path((ground_robot_pos[0], 0, ground_robot_pos[1]), (goal_pos["x"], 0, goal_pos["y"]), *self.agent.navmesh)
+                # path = find_path((ground_robot_pos[0], 0, ground_robot_pos[1]), (goal_pos["x"], 0, goal_pos["y"]), *self.agent.navmesh)
+
+                paths = find_path_two_bots(
+                    (ground_robot_pos[0], 0, ground_robot_pos[1]),
+                    (goal_pos["x"], 0, goal_pos["y"]),
+                    (ground_other_robot_pos[0], 0, ground_other_robot_pos[1]),
+                    (other_goal_pos["x"], 0, other_goal_pos["y"]),
+                    *self.agent.navmesh
+                )
+
+                path = paths[0] if paths else None
 
                 if path is not None:
                     logger.info(f"[Behavior] Path found: {path}")
@@ -144,6 +179,41 @@ class AlphaBotAgent(Agent):
                 if len(path) < 2:
                     logger.warning(f"[Behavior] Path only contains {len(path)} elements, not enough waypoints.")
                     return
+
+                other_path = paths[1]
+                collides = find_collision(path, other_path, step_dist=0.2)
+
+                if collides is not None:
+                    # Possible collision detected on the path.
+                    # If we're the closest to the goal, we should wait and let the other robot pass.
+                    # Otherwise, pray to the gods that the other robot will wait for us.
+    
+                    point1, point2, collision_dist = collides
+
+                    logger.info(f"[Behavior] Collision detected on path: {point1} {point2} {collision_dist}")
+
+                    # Compute distance to the goal for both robots
+                    our_dist_to_goal = 0
+                    other_dist_to_goal = 0
+                    for i in range(len(path) - 1):
+                        p1, p2 = path[i], path[i + 1]
+                        pp1, pp2 = other_path[i], other_path[i + 1]
+                        our_dist_to_goal += np.linalg.norm(p2 - p1)
+                        other_dist_to_goal += np.linalg.norm(pp2 - pp1)
+
+                    # Are we closer to the goal than the other robot?
+                    if our_dist_to_goal < other_dist_to_goal:
+                        logger.info("[Behavior] We are closer to the goal, waiting for the other robot to pass.")
+                        waiting_point = find_waiting_point(path, other_path)
+                        if waiting_point is not None:
+                            shortened_path, _, _ = waiting_point
+                            logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
+                            path = shortened_path
+                        else:
+                            logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
+                    else:
+                        logger.info("[Behavior] Other bot is closer to the goal. Hope they're well behaved and will wait for us.")
+
 
                 next_waypoint_id = 1
                 next_waypoint = path[next_waypoint_id]
