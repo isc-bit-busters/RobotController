@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
 from transformers import AutoModelForDepthEstimation, AutoImageProcessor
 
 # ===================== CONFIGURATION =====================
@@ -11,7 +10,7 @@ processor = AutoImageProcessor.from_pretrained(DEPTH_MODEL_NAME)
 depth_model = AutoModelForDepthEstimation.from_pretrained(DEPTH_MODEL_NAME)
 
 # ===================== DEPTH ESTIMATION =====================
-def estimate_depth_map(image, visualize=False, threshold=0.7):
+def estimate_depth_map(image, threshold=0.7):
     """
     Estimates depth and returns obstacle detection info by zone.
 
@@ -48,12 +47,6 @@ def estimate_depth_map(image, visualize=False, threshold=0.7):
     mean_left = np.mean(left)
     mean_center = np.mean(center)
     mean_right = np.mean(right)
-
-    if visualize:
-        plt.imshow(depth_normalized, cmap="inferno")
-        plt.title("Depth Map")
-        plt.axis("off")
-        plt.show()
 
     return {
         "left": mean_left > threshold,
