@@ -77,7 +77,7 @@ RUN git clone https://github.com/raspberrypi/picamera2.git /opt/picamera2
 WORKDIR /opt/picamera2
 RUN pip install .
 
-RUN pip install opencv-python torch
+RUN pip install opencv-python torch transformers
 
 ENV PYTHONPATH=/usr/local/lib/aarch64-linux-gnu/python3.9/site-packages:$PYTHONPATH
 
