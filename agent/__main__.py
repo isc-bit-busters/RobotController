@@ -92,9 +92,6 @@ class AlphaBotAgent(Agent):
                 }
             }
 
-            robot_id = 7
-            goal_id = 0
-
             msg = await self.receive(timeout=10)
 
             async def process():
@@ -142,25 +139,25 @@ class AlphaBotAgent(Agent):
                     logger.warning("[Behavior] ⚠ Other agent goal ID not found in image.")
                     return
 
-                delta_x = abs(self.agent.last_position["x"] - arucos[robot_id]["x"])
-                delta_y = abs(self.agent.last_position["y"] - arucos[robot_id]["y"])
-                logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
-                if delta_x <= 1 or delta_y <= 1:
-                    logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
-                    self.agent.alphabot.move_back(1)
-                    self.agent.alphabot.turn_left(0.1)
-                    return
-                if self.agent.last_position == arucos[robot_id]:
-                    logger.info("[Behavior] Same position as before, skipping image.")
-                    
-                self.agent.last_position = arucos[robot_id]
-
                 # Get the robot and goal arucos positions on the image
                 robot_pos = arucos[arucos_ids[self.agent.robot_name]["robot"]]
                 goal_pos = arucos[arucos_ids[self.agent.robot_name]["goal"]]
 
                 other_robot_pos = arucos[arucos_ids[self.agent.other_agent]["robot"]]
                 other_goal_pos = arucos[arucos_ids[self.agent.other_agent]["goal"]]
+
+                delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
+                delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
+                logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
+                if delta_x <= 1 or delta_y <= 1:
+                    logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
+                    self.agent.alphabot.move_back(1)
+                    self.agent.alphabot.turn_left(0.1)
+                    return
+                if self.agent.last_position == robot_pos:
+                    logger.info("[Behavior] Same position as before, skipping image.")
+                    
+                self.agent.last_position = robot_pos
 
                 # Apply the homography transformation to the robot to get its "ground" position
                 trans = self.agent.trans
