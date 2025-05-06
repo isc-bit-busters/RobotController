@@ -51,8 +51,8 @@ class AlphaBotAgent(Agent):
         # self.camera_matrix = None
         # self.dist_coeffs = None
         # self.focal_length = None
-        # self.running = True  # Add this flag
-
+        # self.running = True  
+        self.last_position = []
     async def setup(self):
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
@@ -95,7 +95,6 @@ class AlphaBotAgent(Agent):
             robot_id = 7
             goal_id = 0
 
-
             msg = await self.receive(timeout=10)
 
             async def process():
@@ -122,6 +121,8 @@ class AlphaBotAgent(Agent):
                 img = cv2.imdecode(np.frombuffer(decoded_img, np.uint8), cv2.IMREAD_COLOR)
                 logger.info("[Behavior] Image decoded successfully.")
 
+                img = cv2.resize(img, (1024, 576), img)
+
                 arucos = detectAruco(img)
                 print(f"Detected Arucos: {arucos}")
 
@@ -140,6 +141,19 @@ class AlphaBotAgent(Agent):
                 if arucos_ids[self.agent.other_agent]["goal"] not in arucos:
                     logger.warning("[Behavior] ⚠ Other agent goal ID not found in image.")
                     return
+
+                delta_x = abs(self.agent.last_position["x"] - arucos[robot_id]["x"])
+                delta_y = abs(self.agent.last_position["y"] - arucos[robot_id]["y"])
+                logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
+                if delta_x <= 1 or delta_y <= 1:
+                    logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
+                    self.agent.alphabot.move_back(1)
+                    self.agent.alphabot.turn_left(0.1)
+                    return
+                if self.agent.last_position == arucos[robot_id]:
+                    logger.info("[Behavior] Same position as before, skipping image.")
+                    
+                self.agent.last_position = arucos[robot_id]
 
                 # Get the robot and goal arucos positions on the image
                 robot_pos = arucos[arucos_ids[self.agent.robot_name]["robot"]]
@@ -309,10 +323,9 @@ class AlphaBotAgent(Agent):
 
             await process()
 
-            if self.agent.running:
-                delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
-                request_image_behavior = self.agent.RequestImageBehaviour(start_at=datetime.datetime.now() + delta)
-                self.agent.add_behaviour(request_image_behavior)
+            delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
+            request_image_behavior = self.agent.RequestImageBehaviour(start_at=datetime.datetime.now() + delta)
+            self.agent.add_behaviour(request_image_behavior)
     class StartStopBehaviour(TimeoutBehaviour):
         async def run(self):
             logger.info("[StartStop] Waiting for start/stop commands...")
@@ -322,7 +335,6 @@ class AlphaBotAgent(Agent):
                 command = msg.body.lower()
                 if command == "start":
                     logger.info("[StartStop] Received start command. Starting robot...")
-                    self.agent.running = True  # Set the running flag to True
 
                     # Remove existing RequestImageBehaviour instances
                     for behavior in self.agent.behaviours:
@@ -336,7 +348,6 @@ class AlphaBotAgent(Agent):
 
                 elif command == "stop":
                     logger.info("[StartStop] Received stop command. Stopping robot...")
-                    self.agent.running = False  # Set the running flag to False
 
                     # Remove all RequestImageBehaviour instances
                     for behavior in self.agent.behaviours:
@@ -420,7 +431,7 @@ class AlphaBotAgent(Agent):
             return img
 
         async def run(self):
-            robot_id = 7
+            robot_id = 8
 
             a_points, b_points = load_points("/agent/points_mapping.png")
             logger.info(f"[Step 0] Points loaded: {a_points}, {b_points}")
@@ -483,11 +494,7 @@ class AlphaBotAgent(Agent):
                         for x1, y1, x2, y2 in walls 
                         for tx1, ty1 in [trans((x1, y1))]
                         for tx2, ty2 in [trans((x2, y2))]]
-                #Apply the homography transformation to the cubes
-                cubes = [[tx1, ty1, tx2, ty2]
-                        for x1, y1, x2, y2 in cubes
-                        for tx1, ty1 in [trans((x1, y1))]
-                        for tx2, ty2 in [trans((x2, y2))]]
+               
                 walls_img = img0.copy()
                 for p in walls:
                     cv2.rectangle(
@@ -555,10 +562,14 @@ class AlphaBotAgent(Agent):
                         img1 = await self.request_image("1_initial")
                         continue
                 arucos1 = detectAruco(img1)
+            
                 print(f"Detected Arucos: {arucos1}")
                 if robot_id not in arucos1:
                     logger.warning("[Step 1] ⚠ Robot ID not found in initial image.")
+                    self.agent.alphabot.advance(0.2)
                     continue
+                else: 
+                    self.agent.last_position = arucos1[robot_id]
 
                 pos1 = arucos1[robot_id]
                 logger.info(f"[Step 1] Robot initial position: {pos1}")
@@ -589,6 +600,9 @@ class AlphaBotAgent(Agent):
             arucos2 = detectAruco(img2)
             if robot_id not in arucos2:
                 logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
+                return
+            else: 
+                self.agent.last_position = arucos2[robot_id]
 
             pos2 = arucos2[robot_id]
             logger.info(f"[Step 3] Robot new position: {pos2}")
@@ -613,6 +627,9 @@ class AlphaBotAgent(Agent):
             arucos3 = detectAruco(img3)
             if robot_id not in arucos3:
                 logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
+                return
+            else:
+                self.agent.last_position = arucos3[robot_id]
             
             pos3 = arucos3[robot_id]
             logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")

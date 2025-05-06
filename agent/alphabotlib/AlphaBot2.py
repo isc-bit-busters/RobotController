@@ -107,7 +107,13 @@ class AlphaBot2(object):
 				time.sleep(0.1)  # Move forward for a short time
 
 		self.stop()
-
+	def move_back(self, duration=1.0):
+		start_time = time.time()
+		while time.time() - start_time < duration:
+			self.setPWMA(7.8*1.2)
+			self.setPWMB(7.8*1.2)
+			self.backward()
+			time.sleep(0.1)
 
 	def get_move_time(self, dist):
 		return dist / self.speed
