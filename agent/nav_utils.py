@@ -142,11 +142,18 @@ def find_path_two_bots(start1, end1, start2, end2, vertices, polygons):
     return paths
 
 def find_collision(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_REAL):
+    path1 = numpy.array(path1)
+    path2 = numpy.array(path2)
+
     # Pad the shorter path with its last point to match lengths
     if len(path1) < len(path2):
-        path1 = path1 + [path1[-1]] * (len(path2) - len(path1))
+        last_point = path1[-1].reshape(1, -1)
+        padding = numpy.tile(last_point, (len(path2) - len(path1), 1))
+        path1 = numpy.vstack((path1, padding))
     elif len(path2) < len(path1):
-        path2 = path2 + [path2[-1]] * (len(path1) - len(path2))
+        last_point = path2[-1].reshape(1, -1)
+        padding = numpy.tile(last_point, (len(path1) - len(path2), 1))
+        path2 = numpy.vstack((path2, padding))
     
     # Pre-compute path segments and lengths once
     segments1 = []

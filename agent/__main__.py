@@ -210,9 +210,11 @@ class AlphaBotAgent(Agent):
                     other_dist_to_goal = 0
                     for i in range(len(path) - 1):
                         p1, p2 = path[i], path[i + 1]
-                        pp1, pp2 = other_path[i], other_path[i + 1]
                         our_dist_to_goal += np.linalg.norm(p2 - p1)
-                        other_dist_to_goal += np.linalg.norm(pp2 - pp1)
+
+                    for i in range(len(other_path) - 1):
+                        p1, p2 = other_path[i], other_path[i + 1]
+                        other_dist_to_goal += np.linalg.norm(p2 - p1)
 
                     # Are we closer to the goal than the other robot?
                     if our_dist_to_goal < other_dist_to_goal:
