@@ -577,17 +577,18 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Step 1] Robot initial position: {pos1}")
 
                 detected_bot = True
-            msg = Message(to=f"armClient@prosody")
-            msg.set_metadata("type", "set_host_ip")
-            msg.body = "10.30.5.159"
-            await self.send(msg)
-            msg.set_metadata("type", "activate_gripper")
-            await self.send(msg)
-            msg.set_metadata("type", "open_gripper")    
-            await self.send(msg)
-            # msg.set_metadata("type", "trajectory")
-            # msg.body = "[[-0.09, 0.27, 0.2,0,0,-1]]"
-            # await self.send(msg)
+            if self.agent.robot_name == "gerald":
+                msg = Message(to=f"armClient@prosody")
+                msg.set_metadata("type", "set_host_ip")
+                msg.body = "10.30.5.159"
+                await self.send(msg)
+                msg.set_metadata("type", "activate_gripper")
+                await self.send(msg)
+                msg.set_metadata("type", "open_gripper")    
+                await self.send(msg)
+                # msg.set_metadata("type", "trajectory")
+                # msg.body = "[[-0.09, 0.27, 0.2,0,0,-1]]"
+                # await self.send(msg)
       
             logger.info("[RoboticArm] Message sent ...")
             await asyncio.sleep(2)
