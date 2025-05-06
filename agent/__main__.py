@@ -54,6 +54,7 @@ class AlphaBotAgent(Agent):
         # self.running = True  
         self.last_position = []
     async def setup(self):
+        logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
         
