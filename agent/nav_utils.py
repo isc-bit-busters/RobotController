@@ -142,6 +142,11 @@ def find_path_two_bots(start1, end1, start2, end2, vertices, polygons):
     return paths
 
 def find_collision(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_REAL):
+    if len(path1) < 2 or len(path2) < 2:
+        print("Path too short to check for collision:")
+        print(len(path1), len(path2))
+        return None
+
     path1 = numpy.array(path1)
     path2 = numpy.array(path2)
 
