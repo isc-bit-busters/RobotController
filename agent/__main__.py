@@ -454,16 +454,16 @@ class AlphaBotAgent(Agent):
 
                 logger.info("[Step 0] Requesting initial image...")
                 img0 = await self.request_image("0_initial")
-                while True: 
-                    msg = await self.receive(timeout=1)
-                    if msg and msg.body.startswith("validate"):
-                        logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
-                        break
-                    elif msg and msg.body.startswith("take_picture"):
-                        # request another img and wait the validation button 
-                        logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
-                        img0 = await self.request_image("0_initial")
-                        continue
+                # while True: 
+                #     msg = await self.receive(timeout=1)
+                #     if msg and msg.body.startswith("validate"):
+                #         logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
+                #         break
+                #     elif msg and msg.body.startswith("take_picture"):
+                #         # request another img and wait the validation button 
+                #         logger.info(f"[Step 0] Received message from {msg.sender}: {msg.body}")
+                #         img0 = await self.request_image("0_initial")
+                #         continue
 
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
                 img0 = cv2.resize(img0, (1024, 576), img0)
