@@ -471,8 +471,9 @@ class AlphaBotAgent(Agent):
                 cubes = detect_cubes_camera_agent(img0)
                 print(len(cubes))
                 wall_scale_factor = 0.8
-
-                # Scale the walls to make them longer
+                # send a message to another agent
+                
+                
                 new_walls = []
                 for wall in walls:
                     x1, y1, x2, y2 = wall
@@ -576,8 +577,19 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Step 1] Robot initial position: {pos1}")
 
                 detected_bot = True
-            
-
+            msg = Message(to=f"armClient@prosody")
+            msg.set_metadata("type", "set_host_ip")
+            msg.body = "10.30.5.159"
+            await self.send(msg)
+            msg.set_metadata("type", "activate_gripper")
+            await self.send(msg)
+            msg.set_metadata("type", "open_gripper")    
+            await self.send(msg)
+            # msg.set_metadata("type", "trajectory")
+            # msg.body = "[[-0.09, 0.27, 0.2,0,0,-1]]"
+            # await self.send(msg)
+      
+            logger.info("[RoboticArm] Message sent ...")
             await asyncio.sleep(2)
             logger.info("[Step 1.5] Waiting for a message from another agent...")
 
