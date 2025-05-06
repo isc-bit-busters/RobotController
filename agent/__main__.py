@@ -39,6 +39,17 @@ IMAGE_INTERVAL_MS = 500
 IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
 SKIP_DIST = 15
 
+arucos_ids = {
+    "gerald": {
+        "robot": 8,
+        "goal": 1
+    },
+    "mael": {
+        "robot": 7,
+        "goal": 0
+    }
+}
+
 class AlphaBotAgent(Agent):
     def __init__(self, jid, password, verify_security=True, name=None):
         super().__init__(jid=jid, password=password, verify_security=verify_security)
@@ -81,17 +92,6 @@ class AlphaBotAgent(Agent):
             msg.metadata = {"thread": thread_id}
             now = datetime.datetime.now()
             await self.send(msg)
-
-            arucos_ids = {
-                "gerald": {
-                    "robot": 8,
-                    "goal": 1
-                },
-                "mael": {
-                    "robot": 7,
-                    "goal": 0
-                }
-            }
 
             msg = await self.receive(timeout=10)
 
@@ -430,7 +430,7 @@ class AlphaBotAgent(Agent):
             return img
 
         async def run(self):
-            robot_id = 8
+            robot_id = arucos_ids[self.agent.robot_name]["robot"]
 
             a_points, b_points = load_points("/agent/points_mapping.png")
             logger.info(f"[Step 0] Points loaded: {a_points}, {b_points}")
