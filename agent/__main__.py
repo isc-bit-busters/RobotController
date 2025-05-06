@@ -469,33 +469,40 @@ class AlphaBotAgent(Agent):
                 img0 = cv2.resize(img0, (1024, 576), img0)
                 walls = detect_walls(img0)
                 cubes = detect_cubes_camera_agent(img0)
-                print(len(cubes))
-                wall_scale_factor = 0.8
-                # send a message to another agent
+                # receive message from another agent 
+                
+                msg = await self.receive(timeout=999)  # Check for a message every second
+                logger.info(f" Walls {msg.sender}: {msg.body}")
                 
                 
-                new_walls = []
-                for wall in walls:
-                    x1, y1, x2, y2 = wall
-                    length_x = abs(x2 - x1)
-                    length_y = abs(y2 - y1)
-
-                    if length_x > length_y:
-                        x1 = int(x1 - (length_x - length_x * wall_scale_factor) / 2)
-                        x2 = int(x2 + (length_x - length_x * wall_scale_factor) / 2)
-                    else:
-                        y1 = int(y1 - (length_y - length_y * wall_scale_factor) / 2)
-                        y2 = int(y2 + (length_y - length_y * wall_scale_factor) / 2)
-
-                    new_walls.append([x1, y1, x2, y2])
-
-                walls = new_walls
                 
-                # Apply the homography transformation to the walls
-                walls = [[tx1, ty1, tx2, ty2] 
-                        for x1, y1, x2, y2 in walls 
-                        for tx1, ty1 in [trans((x1, y1))]
-                        for tx2, ty2 in [trans((x2, y2))]]
+                # print(len(cubes))
+                # wall_scale_factor = 0.8
+                # # send a message to another agent
+                
+                
+                # new_walls = []
+                # for wall in walls:
+                #     x1, y1, x2, y2 = wall
+                #     length_x = abs(x2 - x1)
+                #     length_y = abs(y2 - y1)
+
+                #     if length_x > length_y:
+                #         x1 = int(x1 - (length_x - length_x * wall_scale_factor) / 2)
+                #         x2 = int(x2 + (length_x - length_x * wall_scale_factor) / 2)
+                #     else:
+                #         y1 = int(y1 - (length_y - length_y * wall_scale_factor) / 2)
+                #         y2 = int(y2 + (length_y - length_y * wall_scale_factor) / 2)
+
+                #     new_walls.append([x1, y1, x2, y2])
+
+                # walls = new_walls
+                
+                # # Apply the homography transformation to the walls
+                # walls = [[tx1, ty1, tx2, ty2] 
+                #         for x1, y1, x2, y2 in walls 
+                #         for tx1, ty1 in [trans((x1, y1))]
+                #         for tx2, ty2 in [trans((x2, y2))]]
                
                 walls_img = img0.copy()
                 for p in walls:
