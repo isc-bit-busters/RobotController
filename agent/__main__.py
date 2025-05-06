@@ -138,8 +138,8 @@ class AlphaBotAgent(Agent):
                     return
                 
                 if arucos_ids[self.agent.other_agent]["goal"] not in arucos:
-                    logger.warning("[Behavior] ⚠ Other agent goal ID not found in image.")
-                    return
+                    logger.warning("[Behavior] ⚠ Other robot goal ID not found in image. Setting it to other robot's position.")
+                    arucos_ids[self.agent.other_agent]["goal"] = arucos_ids[self.agent.other_agent]["robot"]
 
                 # Get the robot and goal arucos positions on the image
                 robot_pos = arucos[arucos_ids[self.agent.robot_name]["robot"]]
