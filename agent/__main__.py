@@ -122,7 +122,8 @@ class AlphaBotAgent(Agent):
                 img = cv2.resize(img, (1024, 576), img)
 
                 arucos = detectAruco(img)
-                print(f"Detected Arucos: {arucos}")
+                print(f"[{self.agent.robot_name}] Detected Arucos: {arucos}")
+                print(f"My arucos: {arucos_ids[self.agent.robot_name]}")
 
                 if arucos_ids[self.agent.robot_name]["robot"] not in arucos:
                     logger.warning("[Behavior] ⚠ Robot ID not found in image.")
