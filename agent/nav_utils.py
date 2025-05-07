@@ -120,13 +120,13 @@ def find_path_two_bots(start1, end1, start2, end2, vertices, polygons):
 
     agent_one = pathfinder.add_agent(
         start1,
-        AGENT_RADIUS_SCALED,
+        AGENT_RADIUS_SCALED * 1.5,
         1,
     )
 
     agent_two = pathfinder.add_agent(
         start2,
-        AGENT_RADIUS_SCALED,
+        AGENT_RADIUS_SCALED * 1.5,
         1,
     )
 
@@ -146,6 +146,8 @@ def find_collision(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_REAL):
         print("Path too short to check for collision:")
         print(len(path1), len(path2))
         return None
+
+    robot_radius *= 1.5
 
     path1 = numpy.array(path1)
     path2 = numpy.array(path2)
@@ -276,6 +278,8 @@ def find_waiting_point(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_RE
     """
     Find a point on path1 where the robot can wait for path2 to pass.
     """
+
+    robot_radius *= 1.5
 
     def cut_path(path, dist):
         out_path = []
