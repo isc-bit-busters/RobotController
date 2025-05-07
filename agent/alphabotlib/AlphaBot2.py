@@ -101,8 +101,8 @@ class AlphaBot2(object):
 				logger.info("Obstacle detected on the right. Turning left.")
 				self.turn_right(float(self.get_rotation_time(45)))  # Turn left for 90 degrees
 			else:
-				self.setPWMA(7.8*1.2)
-				self.setPWMB(7.8*1.2)
+				self.setPWMA(7.8*2)
+				self.setPWMB(7.8*2)
 				self.forward()
 				time.sleep(0.1)  # Move forward for a short time
 
@@ -110,8 +110,8 @@ class AlphaBot2(object):
 	def move_back(self, duration=1.0):
 		start_time = time.time()
 		while time.time() - start_time < duration:
-			self.setPWMA(7.8*1.2)
-			self.setPWMB(7.8*1.2)
+			self.setPWMA(7.8*2)
+			self.setPWMB(7.8*2)
 			self.backward()
 			time.sleep(0.1)
 

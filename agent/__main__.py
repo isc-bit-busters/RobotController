@@ -141,6 +141,7 @@ class AlphaBotAgent(Agent):
 
                 if arucos_ids[self.agent.robot_name]["robot"] not in arucos:
                     logger.warning("[Behavior] ⚠ Robot ID not found in image.")
+                    self.agent.alphabot.advance(2)
                     return
                 
                 if arucos_ids[self.agent.robot_name]["goal"] not in arucos:
@@ -165,7 +166,7 @@ class AlphaBotAgent(Agent):
                 delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
                 delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
                 logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
-                if delta_x <= 1 or delta_y <= 1:
+                if delta_x <= 0.5 and delta_y <= 0.5:
                     logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
                     self.agent.alphabot.move_back(1)
                     self.agent.alphabot.turn_left(0.1)
@@ -245,11 +246,13 @@ class AlphaBotAgent(Agent):
 
 
                 next_waypoint_id = 1
-                next_waypoint = path[next_waypoint_id]
+                next_waypoint = path[0] if len(path) == 1 else path[next_waypoint_id]
                 last_waypoint = path[-1]
                 dist_to_next_waypoint = math.sqrt(
-                    (next_waypoint[0] - robot_pos["x"]) ** 2 + (next_waypoint[2] - robot_pos["y"]) ** 2
+                    (next_waypoint[0] - ground_robot_pos[0]) ** 2 + (next_waypoint[2] - ground_robot_pos[1]) ** 2
                 )
+                    
+                logger.info(f"[Behaviour] SKIP::: {dist_to_next_waypoint}")
 
                 # Robot has a hard time moving really small distances, so skip waypoints that are too close
                 dist_to_skip = SKIP_DIST
@@ -494,39 +497,37 @@ class AlphaBotAgent(Agent):
                 now = datetime.datetime.now()
                 await self.send(msg) # Check for a message every second
                 walls = await self.receive(timeout=10)
-                new_walls = json.loads(walls.body)
+                walls = json.loads(walls.body)
                 #convert this in an iterable object
-                walls = detect_walls(img0)
-                
-                cubes = detect_cubes_camera_agent(img0)
-                walls += cubes
+                # walls = detect_walls(img0)
+                # cubes = detect_cubes_camera_agent(img0)
+                # walls += cubes
                 # do comparation btw new_walls and walls
-                walls_server_array = np.array(new_walls)
-                walls_robot_array = np.array(walls)
+                # walls_server_array = np.array(new_walls)
+                # walls_robot_array = np.array(walls)
 
-                # Compare the arrays
-                if np.array_equal(walls_server_array, walls_robot_array):
-                    logger.info("[Comparison] Walls server and Walls robot are the same.")
-                else:
-                    logger.info("[Comparison] Walls server and Walls robot are different.")
+                # # Compare the arrays
+                # if np.array_equal(walls_server_array, walls_robot_array):
+                #     logger.info("[Comparison] Walls server and Walls robot are the same.")
+                # else:
+                #     logger.info("[Comparison] Walls server and Walls robot are different.")
                     
-                    # Find the differences
-                    diff_server = []
-                    diff_robot = []
+                #     # Find the differences
+                #     diff_server = []
+                #     diff_robot = []
 
-                    for i, (server_row, robot_row) in enumerate(zip(walls_server_array, walls_robot_array)):
-                        if not np.array_equal(server_row, robot_row):
-                            diff_server.append(server_row)
-                            diff_robot.append(robot_row)
+                #     for i, (server_row, robot_row) in enumerate(zip(walls_server_array, walls_robot_array)):
+                #         if not np.array_equal(server_row, robot_row):
+                #             diff_server.append(server_row)
+                #             diff_robot.append(robot_row)
 
-                    logger.info(f"[Comparison] Differences in Walls server: {diff_server}")
-                    logger.info(f"[Comparison] Differences in Walls robot: {diff_robot}")
+                #     logger.info(f"[Comparison] Differences in Walls server: {diff_server}")
+                #     logger.info(f"[Comparison] Differences in Walls robot: {diff_robot}")
                 
                 # receive message from another agent 
                 
                 # msg = await self.receive(timeout=999)  # Check for a message every second
                 # logger.info(f" Walls {msg.sender}: {msg.body}")
-                
                 
                 
                 # print(len(cubes))
