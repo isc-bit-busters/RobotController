@@ -1,5 +1,6 @@
 import base64
 import datetime
+import json
 import math
 # from agent.vision import *
 # from agent.camera_api import CameraHandler
@@ -94,7 +95,16 @@ class AlphaBotAgent(Agent):
             await self.send(msg)
 
             msg = await self.receive(timeout=10)
-
+            
+            # thread_id = str(uuid.uuid4())
+            # msg = Message(to="camera_agent@prosody") 
+            # msg.body = "request_walls"
+            # msg.thread = thread_id
+            # msg.metadata = {"thread": thread_id}
+            # now = datetime.datetime.now()
+            # await self.send(msg) # Check for a message every second
+            # walls = await self.receive(timeout=10)
+            # walls = json.loads(walls.body)
             async def process():
                 if not msg:
                     logger.info("[Behavior] No message received.")
@@ -449,6 +459,9 @@ class AlphaBotAgent(Agent):
                     lines = f.readlines()
                     vertices = eval(lines[0])
                     polygons = eval(lines[1])
+                
+                # msg = await self.receive(timeout=10)  # Check for a message every second
+                # logger.info(f" Walls {msg.sender}: {msg.body}")
             else:
                 logger.info("[Step 0] No cached NavMesh found, generating a new one...")
 
@@ -466,13 +479,49 @@ class AlphaBotAgent(Agent):
                 #         continue
 
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
-                img0 = cv2.resize(img0, (1024, 576), img0)
+                print(f"img0 shape: {img0.shape}")
+                # img0 = cv2.resize(img0, (1024,576), img0)
+               
+                thread_id = str(uuid.uuid4())
+                msg = Message(to="camera_agent@prosody") 
+                msg.body = "request_walls"
+                msg.thread = thread_id
+                msg.metadata = {"thread": thread_id}
+                now = datetime.datetime.now()
+                await self.send(msg) # Check for a message every second
+                walls = await self.receive(timeout=10)
+                new_walls = json.loads(walls.body)
+                #convert this in an iterable object
                 walls = detect_walls(img0)
+                
                 cubes = detect_cubes_camera_agent(img0)
+                walls += cubes
+                # do comparation btw new_walls and walls
+                walls_server_array = np.array(new_walls)
+                walls_robot_array = np.array(walls)
+
+                # Compare the arrays
+                if np.array_equal(walls_server_array, walls_robot_array):
+                    logger.info("[Comparison] Walls server and Walls robot are the same.")
+                else:
+                    logger.info("[Comparison] Walls server and Walls robot are different.")
+                    
+                    # Find the differences
+                    diff_server = []
+                    diff_robot = []
+
+                    for i, (server_row, robot_row) in enumerate(zip(walls_server_array, walls_robot_array)):
+                        if not np.array_equal(server_row, robot_row):
+                            diff_server.append(server_row)
+                            diff_robot.append(robot_row)
+
+                    logger.info(f"[Comparison] Differences in Walls server: {diff_server}")
+                    logger.info(f"[Comparison] Differences in Walls robot: {diff_robot}")
+                
                 # receive message from another agent 
                 
-                msg = await self.receive(timeout=999)  # Check for a message every second
-                logger.info(f" Walls {msg.sender}: {msg.body}")
+                # msg = await self.receive(timeout=999)  # Check for a message every second
+                # logger.info(f" Walls {msg.sender}: {msg.body}")
                 
                 
                 
@@ -512,18 +561,18 @@ class AlphaBotAgent(Agent):
                     cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
                     cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
                 # draw the cubes in blue
-                for p in cubes:
-                    cv2.rectangle(
-                        walls_img, (int(p[0]), int(p[1])), (int(p[2]), int(p[3])), (255, 0, 0), 2
-                    )
-                    cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
-                    cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
+                # for p in cubes:
+                #     cv2.rectangle(
+                #         walls_img, (int(p[0]), int(p[1])), (int(p[2]), int(p[3])), (255, 0, 0), 2
+                #     )
+                #     cv2.circle(walls_img, (int(p[0]), int(p[1])), 5, (255, 0, 0), -1)
+                #     cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
                 cv2.imwrite("/agent/walls_image.jpg", walls_img)
 
                 logger.info(f"[Step 0] Detected walls: {walls}")
                 before_time = time.time()
                 logger.info("[Step 0] Generating NavMesh...")                
-                walls += cubes
+                # walls += cubes
                 vertices, polygons = generate_navmesh(walls)
                 self.agent.navmesh = (vertices, polygons)
             
@@ -557,6 +606,7 @@ class AlphaBotAgent(Agent):
                 # === STEP 1: Take the first image ===
                 logger.info("[Step 1] Requesting initial image...")
                 img1 = await self.request_image("1_initial")
+                
                 while True and img1 is not None: 
                     msg = await self.receive(timeout=1)  # Check for a message every second
                     if msg:
