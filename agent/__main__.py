@@ -308,7 +308,9 @@ class AlphaBotAgent(Agent):
                             # )
                             # logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
                         else:
-                            logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
+                            logger.warning("[Behavior] No waiting point found, We'll be waiting until no collision is detected.")
+                            self.agent.we_waited = True
+                            return
                     # else:
                     #     other_has_waiting_point = find_waiting_point(other_path, path, step_dist=3)
                     
