@@ -8,7 +8,7 @@ import time
 # gets really slow with a scale that big (in the thousandss).
 # So we scale down the polygons to a more reasonable size.
 SCALE = 50
-AGENT_RADIUS_SCALED = 0.4 # In scaled space
+AGENT_RADIUS_SCALED = 0.43 # In scaled space
 AGENT_RADIUS_REAL = AGENT_RADIUS_SCALED * SCALE # In real space
 
 # def generate_navmesh(input_file="polygons.txt", output_file="navmesh.txt"):
