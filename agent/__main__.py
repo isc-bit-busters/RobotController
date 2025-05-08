@@ -225,16 +225,16 @@ class AlphaBotAgent(Agent):
                 
                 logger.info(f"[Behaviour] going from {ground_robot_pos} to {goal_pos}")
 
-                dist_to_goal = math.sqrt(
+                dist_to_goal_straight = math.sqrt(
                     (goal_pos["x"] - ground_robot_pos[0]) ** 2 + (goal_pos["y"] - ground_robot_pos[1]) ** 2
                 )
 
-                other_dist_to_goal = math.sqrt(
+                other_dist_to_goal_straight = math.sqrt(
                     (other_goal_pos["x"] - ground_other_robot_pos[0]) ** 2 + (other_goal_pos["y"] - ground_other_robot_pos[1]) ** 2
                 )
 
-                logger.info(f"[Behavior] Distance to goal: {dist_to_goal}")
-                logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal}")
+                logger.info(f"[Behavior] Distance to goal: {dist_to_goal_straight}")
+                logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal_straight}")
 
                 # path = find_path((ground_robot_pos[0], 0, ground_robot_pos[1]), (goal_pos["x"], 0, goal_pos["y"]), *self.agent.navmesh)
 
@@ -386,7 +386,7 @@ class AlphaBotAgent(Agent):
                 if next_waypoint_id == len(path) - 1:
                     logger.info("[Behavior] We're about to reach the goal!")
 
-                    if other_dist_to_goal > GOAL_WAIT_DIST:
+                    if other_dist_to_goal_straight > GOAL_WAIT_DIST:
                         logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
                         path = [path[0]]
                     else:
