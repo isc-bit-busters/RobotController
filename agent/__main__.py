@@ -195,8 +195,13 @@ class AlphaBotAgent(Agent):
                     other_delta_x = 999
                     other_delta_y = 999
 
-                delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
-                delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
+                if self.agent.last_position != []:
+                    delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
+                    delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
+                else:
+                    delta_x = 999
+                    delta_y = 999
+
                 logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
                 if not self.agent.we_waited and delta_x <= 0.5 and delta_y <= 0.5:
                     logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
