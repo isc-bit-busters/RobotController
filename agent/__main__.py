@@ -72,6 +72,7 @@ class AlphaBotAgent(Agent):
         self.wait_hold = 0
         self.waiting_point = None
         self.we_wait = None
+        self.we_waited = False
     async def setup(self):
         logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -191,7 +192,7 @@ class AlphaBotAgent(Agent):
                 delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
                 delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
                 logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
-                if delta_x <= 0.5 and delta_y <= 0.5:
+                if not self.agent.we_waited and delta_x <= 0.5 and delta_y <= 0.5:
                     logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
                     self.agent.alphabot.move_back(1)
                     self.agent.alphabot.turn_left(0.1)
@@ -255,6 +256,8 @@ class AlphaBotAgent(Agent):
 
                 logger.info(f"[Behavior] We should wait: {self.agent.we_wait}")
 
+                self.agent.we_waited = False
+
 
                 if collides and self.agent.we_wait:
                     # Possible collision detected on the path.
@@ -296,6 +299,7 @@ class AlphaBotAgent(Agent):
                             shortened_path, _, dist = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
                             path = shortened_path
+                            self.agent.we_waited = True
                             # self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000)
                             # self.agent.waiting_point = (
                             #     shortened_path[-1][0] * navmesh_scale,
