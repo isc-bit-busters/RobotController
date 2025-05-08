@@ -45,7 +45,7 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
 IMAGE_INTERVAL_MS = 500
 IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
 SKIP_DIST = 30
-GOAL_WAIT_DIST = 80
+GOAL_WAIT_DIST = 120
 
 arucos_ids = {
     "gerald": {
@@ -350,16 +350,6 @@ class AlphaBotAgent(Agent):
                     logger.info("Path empty?????")
                     return
 
-                # Is the robot about to reach the goal? 
-                if next_waypoint_id == len(path) - 1:
-                    logger.info("[Behavior] We're about to reach the goal!")
-
-                    if other_dist_to_goal > GOAL_WAIT_DIST:
-                        logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
-                        path = path[0]
-                    else:
-                        logger.info("[Behavior] Other robot is ready to cross - let's go!")
-                        
 
                 next_waypoint_id = 1
                 next_waypoint = path[0] if len(path) == 1 else path[next_waypoint_id]
@@ -386,14 +376,22 @@ class AlphaBotAgent(Agent):
                     dist_to_skip -= dist_to_next_waypoint
               
                 time_to_move = self.agent.alphabot.get_move_time(dist_to_next_waypoint)
+                        
+                # Is the robot about to reach the goal? 
+                if next_waypoint_id == len(path) - 1:
+                    logger.info("[Behavior] We're about to reach the goal!")
+
+                    if other_dist_to_goal > GOAL_WAIT_DIST:
+                        logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
+                        path = path[0]
+                    else:
+                        logger.info("[Behavior] Other robot is ready to cross - let's go!")
 
 
                 logger.info(f"[Behavior] Next waypoint: #{next_waypoint_id} {next_waypoint}")
                 logger.info(f"[Behavior] Current position: {robot_pos}")
                 logger.info(f"[Behavior] Distance to next waypoint: {dist_to_next_waypoint}")
                 logger.info(f"[Behavior] Time to next waypoint: {time_to_move} seconds")
-                        
-                    
 
                 #region Visualization
 
