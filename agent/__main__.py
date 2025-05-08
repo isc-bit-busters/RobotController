@@ -71,6 +71,7 @@ class AlphaBotAgent(Agent):
         self.stuck_counter = 0
         self.wait_hold = 0
         self.waiting_point = None
+        self.we_wait = None
     async def setup(self):
         logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -239,16 +240,7 @@ class AlphaBotAgent(Agent):
                 other_waiting = other_delta_x <= 0.5 and other_delta_y <= 0.5
                 we_have_priority = self.agent.robot_name == "gerald"
 
-                if not (other_waiting and we_have_priority) or collides is not None or self.agent.wait_hold > 0:
-                    # Possible collision detected on the path.
-                    # If we're the closest to the goal, we should wait and let the other robot pass.
-                    # Otherwise, pray to the gods that the other robot will wait for us.
-    
-                    point1, point2, collision_dist = collides
-
-                    logger.info(f"[Behavior] Collision detected on path: {point1} {point2} {collision_dist}")
-
-                    # Compute distance to the goal for both robots
+                if self.agent.we_wait is None:
                     our_dist_to_goal = 0
                     other_dist_to_goal = 0
                     for i in range(len(path) - 1):
@@ -258,50 +250,77 @@ class AlphaBotAgent(Agent):
                     for i in range(len(other_path) - 1):
                         p1, p2 = other_path[i], other_path[i + 1]
                         other_dist_to_goal += np.linalg.norm(p2 - p1)
-                
-                    we_should_wait = our_dist_to_goal < other_dist_to_goal
-                    logger.info(f"!!!!!!! we_should_wait {we_should_wait} - other_waiting {other_waiting} - wait_hold {self.agent.wait_hold}")
 
-                    if self.agent.wait_hold > 0:
-                        logger.info(f"[Behavior] Still waiting for {self.agent.wait_hold} ticks.")
-                        self.agent.wait_hold -= 1
-                        path = find_path(
-                            (ground_robot_pos[0], 0, ground_robot_pos[1]),
-                            (self.agent.waiting_point[0], 0, self.agent.waiting_point[1]),
-                            *self.agent.navmesh
-                        )
-                    elif we_should_wait:
+                    self.agent.we_wait = our_dist_to_goal < other_dist_to_goal
+
+                logger.info(f"[Behavior] We should wait: {self.agent.we_wait}")
+
+
+                if collides and self.agent.we_wait:
+                    # Possible collision detected on the path.
+                    # If we're the closest to the goal, we should wait and let the other robot pass.
+                    # Otherwise, pray to the gods that the other robot will wait for us.
+    
+                    point1, point2, collision_dist = collides
+
+                    logger.info(f"[Behavior] Collision detected on path: {point1} {point2} {collision_dist}")
+
+                    # # Compute distance to the goal for both robots
+                    # our_dist_to_goal = 0
+                    # other_dist_to_goal = 0
+                    # for i in range(len(path) - 1):
+                    #     p1, p2 = path[i], path[i + 1]
+                    #     our_dist_to_goal += np.linalg.norm(p2 - p1)
+
+                    # for i in range(len(other_path) - 1):
+                    #     p1, p2 = other_path[i], other_path[i + 1]
+                    #     other_dist_to_goal += np.linalg.norm(p2 - p1)
+                
+                    # we_should_wait = our_dist_to_goal < other_dist_to_goal
+                    # logger.info(f"!!!!!!! we_should_wait {we_should_wait} - other_waiting {other_waiting} - wait_hold {self.agent.wait_hold}")
+
+                    we_should_wait = True
+
+                    # if self.agent.wait_hold > 0:
+                    #     logger.info(f"[Behavior] Still waiting for {self.agent.wait_hold} ticks.")
+                    #     self.agent.wait_hold -= 1
+                    #     path = find_path(
+                    #         (ground_robot_pos[0], 0, ground_robot_pos[1]),
+                    #         (self.agent.waiting_point[0], 0, self.agent.waiting_point[1]),
+                    #         *self.agent.navmesh
+                    #     )
+                    if we_should_wait:
                         logger.info("[Behavior] We are closer to the goal, waiting for the other robot to pass.")
                         waiting_point = find_waiting_point(path, other_path, step_dist=2)
                         if waiting_point is not None:
                             shortened_path, _, dist = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
                             path = shortened_path
-                            self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000)
-                            self.agent.waiting_point = (
-                                shortened_path[-1][0] * navmesh_scale,
-                                0,
-                                shortened_path[-1][2] * navmesh_scale
-                            )
-                            logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
+                            # self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000)
+                            # self.agent.waiting_point = (
+                            #     shortened_path[-1][0] * navmesh_scale,
+                            #     0,
+                            #     shortened_path[-1][2] * navmesh_scale
+                            # )
+                            # logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
                         else:
                             logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
-                    else:
-                        other_has_waiting_point = find_waiting_point(other_path, path, step_dist=3)
+                    # else:
+                    #     other_has_waiting_point = find_waiting_point(other_path, path, step_dist=3)
                     
-                        if other_has_waiting_point is not None:
-                            logger.info("[Behavior] Other bot can wait for us. Hope they're well behaved and will wait for us.")
-                        else:
-                            logger.info("[Behavior] Other bot can't wait for us. We'll be the one waiting, then")
-                            path = path[0]
-                            _, _, dist = other_has_waiting_point
-                            self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000) * 1.25
-                            self.agent.waiting_point = (
-                                path[0][0] * navmesh_scale,
-                                0,
-                                path[0][2] * navmesh_scale
-                            )
-                            logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
+                    #     if other_has_waiting_point is not None:
+                    #         logger.info("[Behavior] Other bot can wait for us. Hope they're well behaved and will wait for us.")
+                    #     else:
+                    #         logger.info("[Behavior] Other bot can't wait for us. We'll be the one waiting, then")
+                    #         path = path[0]
+                    #         _, _, dist = other_has_waiting_point
+                    #         self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000) * 1.25
+                    #         self.agent.waiting_point = (
+                    #             path[0][0] * navmesh_scale,
+                    #             0,
+                    #             path[0][2] * navmesh_scale
+                    #         )
+                    #         logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
 
                 if len(path) == 0:
                     logger.info("Path empty?????")
@@ -406,6 +425,7 @@ class AlphaBotAgent(Agent):
             delta = datetime.timedelta(milliseconds=IMAGE_INTERVAL_MS)
             request_image_behavior = self.agent.RequestImageBehaviour(start_at=datetime.datetime.now() + delta)
             self.agent.add_behaviour(request_image_behavior)
+
     class StartStopBehaviour(TimeoutBehaviour):
         async def run(self):
             logger.info("[StartStop] Waiting for start/stop commands...")
