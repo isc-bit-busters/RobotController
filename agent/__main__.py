@@ -255,7 +255,7 @@ class AlphaBotAgent(Agent):
                             shortened_path, _, dist = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
                             path = shortened_path
-                            self.agent.wait_hold = self.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
+                            self.agent.wait_hold = self.agent.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
                         else:
                             logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
@@ -268,7 +268,7 @@ class AlphaBotAgent(Agent):
                             logger.info("[Behavior] Other bot can't wait for us. We'll be the one waiting, then")
                             path = path[0]
                             _, _, dist = other_has_waiting_point
-                            self.agent.wait_hold = self.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
+                            self.agent.wait_hold = self.agent.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
 
                     self.agent.wait_hold -= 1
