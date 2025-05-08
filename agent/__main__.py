@@ -67,6 +67,7 @@ class AlphaBotAgent(Agent):
         # self.focal_length = None
         # self.running = True  
         self.last_position = []
+        self.other_last_position = []
         self.stuck_counter = 0
         self.wait_hold = 0
         self.waiting_point = None
@@ -166,7 +167,7 @@ class AlphaBotAgent(Agent):
                 if arucos_ids[self.agent.other_agent]["robot"] not in arucos:
                     logger.warning("[Behavior] ⚠ Other robot ID not found in image.")
                     return
-                
+ 
                 if arucos_ids[self.agent.other_agent]["goal"] not in arucos:
                     logger.warning("[Behavior] ⚠ Other robot goal ID not found in image. Setting it to other robot's position.")
                     arucos_ids[self.agent.other_agent]["goal"] = arucos_ids[self.agent.other_agent]["robot"]
@@ -177,6 +178,14 @@ class AlphaBotAgent(Agent):
 
                 other_robot_pos = arucos[arucos_ids[self.agent.other_agent]["robot"]]
                 other_goal_pos = arucos[arucos_ids[self.agent.other_agent]["goal"]]
+
+                if self.agent.other_last_position != []:
+                    other_delta_x = abs(self.agent.other_last_position["x"] - other_robot_pos["x"])
+                    other_delta_y = abs(self.agent.other_last_position["y"] - other_robot_pos["y"])
+                else:
+                    other_delta_x = 999
+                    other_delta_y = 999
+
 
                 delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
                 delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
@@ -190,6 +199,7 @@ class AlphaBotAgent(Agent):
                     logger.info("[Behavior] Same position as before, skipping image.")
                     
                 self.agent.last_position = robot_pos
+                self.agent.other_last_position = other_robot_pos
 
                 # Apply the homography transformation to the robot to get its "ground" position
                 trans = self.agent.trans
@@ -226,7 +236,12 @@ class AlphaBotAgent(Agent):
                 other_path = paths[1]
                 collides = find_collision(path, other_path, step_dist=0.2)
 
-                if collides is not None:
+                other_waiting = other_delta_x <= 0.5 and other_delta_y <= 0.5
+                we_have_priority = self.agent.robot_name == "gerald"
+                we_should_wait = our_dist_to_goal < other_dist_to_goal
+                logger.info(f"!!!!!!! we_should_wait {we_should_wait} - other_waiting {other_waiting} - wait_hold {self.agent.wait_hold}")
+
+                if not (other_waiting and we_have_priority) or collides is not None or self.agent.wait_hold > 0:
                     # Possible collision detected on the path.
                     # If we're the closest to the goal, we should wait and let the other robot pass.
                     # Otherwise, pray to the gods that the other robot will wait for us.
@@ -246,8 +261,6 @@ class AlphaBotAgent(Agent):
                         p1, p2 = other_path[i], other_path[i + 1]
                         other_dist_to_goal += np.linalg.norm(p2 - p1)
 
-                    we_should_wait = our_dist_to_goal < other_dist_to_goal
-
                     if self.agent.wait_hold > 0:
                         logger.info(f"[Behavior] Still waiting for {self.agent.wait_hold} ticks.")
                         self.agent.wait_hold -= 1
@@ -263,8 +276,12 @@ class AlphaBotAgent(Agent):
                             shortened_path, _, dist = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
                             path = shortened_path
-                            self.agent.wait_hold = self.agent.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000) * 1.25
-                            self.agent.waiting_point = shortened_path[-1]
+                            self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000)
+                            self.agent.waiting_point = (
+                                shortened_path[-1][0] * navmesh_scale,
+                                0,
+                                shortened_path[-1][2] * navmesh_scale
+                            )
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
                         else:
                             logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
@@ -277,8 +294,12 @@ class AlphaBotAgent(Agent):
                             logger.info("[Behavior] Other bot can't wait for us. We'll be the one waiting, then")
                             path = path[0]
                             _, _, dist = other_has_waiting_point
-                            self.agent.wait_hold = self.agent.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000) * 1.25
-                            self.agent.waiting_point = path[0]
+                            self.agent.wait_hold = self.agent.alphabot.get_move_time(other_dist_to_goal) / (IMAGE_INTERVAL_MS/1000) * 1.25
+                            self.agent.waiting_point = (
+                                path[0][0] * navmesh_scale,
+                                0,
+                                path[0][2] * navmesh_scale
+                            )
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
 
                 if len(path) == 0:
@@ -490,6 +511,7 @@ class AlphaBotAgent(Agent):
 
         async def run(self):
             robot_id = arucos_ids[self.agent.robot_name]["robot"]
+            other_robot_id = arucos_ids[self.agent.other_agent]["robot"] 
 
             a_points, b_points = load_points("/agent/points_mapping.png")
             logger.info(f"[Step 0] Points loaded: {a_points}, {b_points}")
