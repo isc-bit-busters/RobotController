@@ -238,8 +238,6 @@ class AlphaBotAgent(Agent):
 
                 other_waiting = other_delta_x <= 0.5 and other_delta_y <= 0.5
                 we_have_priority = self.agent.robot_name == "gerald"
-                we_should_wait = our_dist_to_goal < other_dist_to_goal
-                logger.info(f"!!!!!!! we_should_wait {we_should_wait} - other_waiting {other_waiting} - wait_hold {self.agent.wait_hold}")
 
                 if not (other_waiting and we_have_priority) or collides is not None or self.agent.wait_hold > 0:
                     # Possible collision detected on the path.
@@ -260,6 +258,9 @@ class AlphaBotAgent(Agent):
                     for i in range(len(other_path) - 1):
                         p1, p2 = other_path[i], other_path[i + 1]
                         other_dist_to_goal += np.linalg.norm(p2 - p1)
+                
+                    we_should_wait = our_dist_to_goal < other_dist_to_goal
+                    logger.info(f"!!!!!!! we_should_wait {we_should_wait} - other_waiting {other_waiting} - wait_hold {self.agent.wait_hold}")
 
                     if self.agent.wait_hold > 0:
                         logger.info(f"[Behavior] Still waiting for {self.agent.wait_hold} ticks.")
