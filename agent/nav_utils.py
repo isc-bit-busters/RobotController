@@ -325,7 +325,7 @@ def find_waiting_point(path1, path2, step_dist=0.1, robot_radius=AGENT_RADIUS_RE
 
     # print("No waiting point found")
     
-    return False
+    return None 
 
 if __name__ == "__main__":
     # start_time = time.time()
