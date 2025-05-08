@@ -281,6 +281,9 @@ class AlphaBotAgent(Agent):
                             self.agent.waiting_point = path[0]
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
 
+                if len(path) == 0:
+                    logger.info("Path empty?????")
+                    return
 
                 next_waypoint_id = 1
                 next_waypoint = path[0] if len(path) == 1 else path[next_waypoint_id]
