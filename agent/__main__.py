@@ -247,7 +247,7 @@ class AlphaBotAgent(Agent):
                     # Are we closer to the goal than the other robot?
                     if our_dist_to_goal < other_dist_to_goal:
                         logger.info("[Behavior] We are closer to the goal, waiting for the other robot to pass.")
-                        waiting_point = find_waiting_point(path, other_path)
+                        waiting_point = find_waiting_point(path, other_path, step_dist=2)
                         if waiting_point is not None:
                             shortened_path, _, _ = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
