@@ -264,18 +264,21 @@ class AlphaBotAgent(Agent):
                 other_waiting = other_delta_x <= 0.5 and other_delta_y <= 0.5
                 we_have_priority = self.agent.robot_name == "gerald"
 
+                our_dist_to_goal = 0
+                other_dist_to_goal = 0
+                for i in range(len(path) - 1):
+                    p1, p2 = path[i], path[i + 1]
+                    our_dist_to_goal += np.linalg.norm(p2 - p1)
+
+                for i in range(len(other_path) - 1):
+                    p1, p2 = other_path[i], other_path[i + 1]
+                    other_dist_to_goal += np.linalg.norm(p2 - p1)
+
                 if self.agent.we_wait is None:
-                    our_dist_to_goal = 0
-                    other_dist_to_goal = 0
-                    for i in range(len(path) - 1):
-                        p1, p2 = path[i], path[i + 1]
-                        our_dist_to_goal += np.linalg.norm(p2 - p1)
-
-                    for i in range(len(other_path) - 1):
-                        p1, p2 = other_path[i], other_path[i + 1]
-                        other_dist_to_goal += np.linalg.norm(p2 - p1)
-
                     self.agent.we_wait = our_dist_to_goal < other_dist_to_goal
+
+                logger.info(f"[Behavior] Distance to goal: {our_dist_to_goal}")
+                logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal}")
 
                 logger.info(f"[Behavior] We should wait: {self.agent.we_wait}")
 
@@ -386,7 +389,7 @@ class AlphaBotAgent(Agent):
                 if next_waypoint_id == len(path) - 1:
                     logger.info("[Behavior] We're about to reach the goal!")
 
-                    if other_dist_to_goal_straight > GOAL_WAIT_DIST:
+                    if other_dist_to_goal > GOAL_WAIT_DIST:
                         logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
                         path = [path[0]]
                     else:
