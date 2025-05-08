@@ -145,7 +145,7 @@ class AlphaBotAgent(Agent):
                 if arucos_ids[self.agent.robot_name]["robot"] not in arucos:
                     logger.warning("[Behavior] ⚠ Robot ID not found in image.")
 
-                    if self.agent.stuck_counter > 2:
+                    if self.agent.stuck_counter > 1:
                         logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving back.")
                         self.agent.alphabot.move_back(1)
                         self.agent.alphabot.turn_left(0.1)
