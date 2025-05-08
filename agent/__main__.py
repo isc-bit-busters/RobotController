@@ -68,6 +68,7 @@ class AlphaBotAgent(Agent):
         # self.running = True  
         self.last_position = []
         self.stuck_counter = 0
+        self.wait_hold = 0
     async def setup(self):
         logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -244,18 +245,33 @@ class AlphaBotAgent(Agent):
                         p1, p2 = other_path[i], other_path[i + 1]
                         other_dist_to_goal += np.linalg.norm(p2 - p1)
 
+                    we_should_wait = self.agent.wait_hold > 0 or our_dist_to_goal < other_dist_to_goal
+
                     # Are we closer to the goal than the other robot?
-                    if our_dist_to_goal < other_dist_to_goal:
+                    if we_should_wait:
                         logger.info("[Behavior] We are closer to the goal, waiting for the other robot to pass.")
                         waiting_point = find_waiting_point(path, other_path, step_dist=2)
                         if waiting_point is not None:
-                            shortened_path, _, _ = waiting_point
+                            shortened_path, _, dist = waiting_point
                             logger.info(f"[Behavior] Waiting point found: {waiting_point[-1]}")
                             path = shortened_path
+                            self.agent.wait_hold = self.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
+                            logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
                         else:
                             logger.warning("[Behavior] No waiting point found, hold on to your butts, we're going to fucking crash.")
                     else:
-                        logger.info("[Behavior] Other bot is closer to the goal. Hope they're well behaved and will wait for us.")
+                        other_has_waiting_point = find_waiting_point(other_path, path, step_dist=3)
+                    
+                        if other_has_waiting_point is not None:
+                            logger.info("[Behavior] Other bot can wait for us. Hope they're well behaved and will wait for us.")
+                        else:
+                            logger.info("[Behavior] Other bot can't wait for us. We'll be the one waiting, then")
+                            path = path[0]
+                            _, _, dist = other_has_waiting_point
+                            self.agent.wait_hold = self.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
+                            logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
+
+                    self.agent.wait_hold -= 1
 
 
                 next_waypoint_id = 1
