@@ -388,7 +388,7 @@ class AlphaBotAgent(Agent):
 
                     if other_dist_to_goal > GOAL_WAIT_DIST:
                         logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
-                        path = path[0]
+                        path = [path[0]]
                     else:
                         logger.info("[Behavior] Other robot is ready to cross - let's go!")
 
