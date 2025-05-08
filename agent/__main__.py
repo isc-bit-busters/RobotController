@@ -72,7 +72,7 @@ class AlphaBotAgent(Agent):
         logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
         logger.info(f"[Agent] Will connect as {self.jid} to server {os.environ.get('XMPP_SERVER', 'prosody')}")
-        send_log_message("Hello from " + self.robot_name, self.robot_name, msg_type="log")
+        # send_log_message("Hello from " + self.robot_name, self.robot_name, msg_type="log")
         
         # Initialize camera and vision components once
         logger.info("[Agent] Initializing camera and vision components...")
@@ -97,7 +97,7 @@ class AlphaBotAgent(Agent):
             msg.metadata = {"thread": thread_id}
             now = datetime.datetime.now()
             await self.send(msg)
-            send_log_message("Requesting image from camera agent", self.agent.robot_name, msg_type="log")
+            # send_log_message("Requesting image from camera agent", self.agent.robot_name, msg_type="log")
 
             msg = await self.receive(timeout=10)
             
@@ -587,7 +587,7 @@ class AlphaBotAgent(Agent):
                 #     cv2.circle(walls_img, (int(p[2]), int(p[3])), 5, (0, 255, 0), -1)
                 cv2.imwrite("/agent/walls_image.jpg", walls_img)
 
-                send_log_message("Walls detected", self.agent.robot_name, msg_type="log")
+                # send_log_message("Walls detected", self.agent.robot_name, msg_type="log")
                 encoded_img = base64.b64encode(walls_img).decode("utf-8")
                 # TODO: too big
                 # send_log_message(encoded_img, self.agent.robot_name, msg_type="path_image")
