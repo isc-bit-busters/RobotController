@@ -682,55 +682,63 @@ class AlphaBotAgent(Agent):
 
             # Wait for a message from the other agent
             
-            t = 2  # seconds
-            # === STEP 2: Move the robot ===
-            logger.info("[Step 2] Moving robot forward...")
-            self.agent.alphabot.advance(t)  # Move for 2 seconds
-            await asyncio.sleep(t)
+            if False:
+                t = 2  # seconds
+                # === STEP 2: Move the robot ===
+                logger.info("[Step 2] Moving robot forward...")
+                self.agent.alphabot.advance(t)  # Move for 2 seconds
+                await asyncio.sleep(t)
 
-            # === STEP 3: Take the second image ===
-            logger.info("[Step 3] Requesting image after movement...")
-            img2 = await self.request_image("2_after_move")
-            arucos2 = detectAruco(img2)
-            if robot_id not in arucos2:
-                logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
-                return
-            else: 
-                self.agent.last_position = arucos2[robot_id]
+                # === STEP 3: Take the second image ===
+                logger.info("[Step 3] Requesting image after movement...")
+                img2 = await self.request_image("2_after_move")
+                arucos2 = detectAruco(img2)
+                if robot_id not in arucos2:
+                    logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
+                    return
+                else: 
+                    self.agent.last_position = arucos2[robot_id]
 
-            pos2 = arucos2[robot_id]
-            logger.info(f"[Step 3] Robot new position: {pos2}")
+                pos2 = arucos2[robot_id]
+                logger.info(f"[Step 3] Robot new position: {pos2}")
 
-            # === STEP 4: Compute distance ===
-            dist = np.sqrt(
-                (pos2["x"] - pos1["x"]) ** 2 + (pos2["y"] - pos1["y"]) ** 2
-            )
-            
-            logger.info(f"[Step 4] Distance moved: {dist}")
-            speed = dist / t
-            self.agent.alphabot.setSpeed(speed)
-            logger.info(f"[Step 4] Speed: {speed} units/s")
+                # === STEP 4: Compute distance ===
+                dist = np.sqrt(
+                    (pos2["x"] - pos1["x"]) ** 2 + (pos2["y"] - pos1["y"]) ** 2
+                )
+                
+                logger.info(f"[Step 4] Distance moved: {dist}")
+                speed = dist / t
+                self.agent.alphabot.setSpeed(speed)
+                logger.info(f"[Step 4] Speed: {speed} units/s")
 
-            # Calibrate rotation speed
-            rot_t = 0.25
-            self.agent.alphabot.turn_left(rot_t)
-            await asyncio.sleep(rot_t)
+                # Calibrate rotation speed
+                rot_t = 0.25
+                self.agent.alphabot.turn_left(rot_t)
+                await asyncio.sleep(rot_t)
 
-            logger.info("[Step 5] Requesting image after rotation...")
-            img3 = await self.request_image("3_after_rotation")
-            arucos3 = detectAruco(img3)
-            if robot_id not in arucos3:
-                logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
-                return
+                logger.info("[Step 5] Requesting image after rotation...")
+                img3 = await self.request_image("3_after_rotation")
+                arucos3 = detectAruco(img3)
+                if robot_id not in arucos3:
+                    logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
+                    return
+                else:
+                    self.agent.last_position = arucos3[robot_id]
+                
+                pos3 = arucos3[robot_id]
+                logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")
+
+                rot_angle = pos3["angle"] - pos2["angle"]
+                self.agent.alphabot.setTurnSpeed(rot_angle / rot_t)
+                logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
             else:
-                self.agent.last_position = arucos3[robot_id]
-            
-            pos3 = arucos3[robot_id]
-            logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")
-
-            rot_angle = pos3["angle"] - pos2["angle"]
-            self.agent.alphabot.setTurnSpeed(rot_angle / rot_t)
-            logger.info(f"[Step 5] Rotation speed: {rot_angle / rot_t} degrees/s")
+                if self.agent.robot_name == "mael":
+                    self.agent.alphabot.setSpeed(91)
+                    self.agent.alphabot.setTurnSpeed(225)
+                else:
+                    self.agent.alphabot.setSpeed(114)
+                    self.agent.alphabot.setTurnSpeed(175)
             
             logger.info(f"[Step 5] Calibration done. Set the robot in the initial position.")
             while True:
