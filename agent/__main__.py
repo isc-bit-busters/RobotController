@@ -245,10 +245,14 @@ class AlphaBotAgent(Agent):
                         p1, p2 = other_path[i], other_path[i + 1]
                         other_dist_to_goal += np.linalg.norm(p2 - p1)
 
-                    we_should_wait = self.agent.wait_hold > 0 or our_dist_to_goal < other_dist_to_goal
+                    we_should_wait = our_dist_to_goal < other_dist_to_goal
 
-                    # Are we closer to the goal than the other robot?
-                    if we_should_wait:
+                    if self.agent.wait_hold > 0:
+                        logger.info(f"[Behavior] Still waiting for {self.agent.wait_hold} ticks.")
+                        self.agent.wait_hold -= 1
+                        path = path[0]
+                        return
+                    elif we_should_wait:
                         logger.info("[Behavior] We are closer to the goal, waiting for the other robot to pass.")
                         waiting_point = find_waiting_point(path, other_path, step_dist=2)
                         if waiting_point is not None:
@@ -270,8 +274,6 @@ class AlphaBotAgent(Agent):
                             _, _, dist = other_has_waiting_point
                             self.agent.wait_hold = self.agent.alphabot.get_move_time(dist) / (IMAGE_INTERVAL_MS/1000)
                             logger.info(f"[Behavior] Waiting for {self.agent.wait_hold} ")
-
-                    self.agent.wait_hold -= 1
 
 
                 next_waypoint_id = 1
