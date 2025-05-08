@@ -757,7 +757,8 @@ class AlphaBotAgent(Agent):
                     self.agent.alphabot.advance(0.2)
                     continue
                 else: 
-                    self.agent.last_position = arucos1[robot_id]
+                    # self.agent.last_position = arucos1[robot_id]
+                    pass
 
                 pos1 = arucos1[robot_id]
                 logger.info(f"[Step 1] Robot initial position: {pos1}")
@@ -803,7 +804,8 @@ class AlphaBotAgent(Agent):
                     logger.warning("[Step 3] ⚠ Robot ID not found in second image.")
                     return
                 else: 
-                    self.agent.last_position = arucos2[robot_id]
+                    # self.agent.last_position = arucos2[robot_id]
+                    pass
 
                 pos2 = arucos2[robot_id]
                 logger.info(f"[Step 3] Robot new position: {pos2}")
@@ -830,7 +832,8 @@ class AlphaBotAgent(Agent):
                     logger.warning("[Step 5] ⚠ Robot ID not found in third image.")
                     return
                 else:
-                    self.agent.last_position = arucos3[robot_id]
+                    # self.agent.last_position = arucos3[robot_id]
+                    pass                    
                 
                 pos3 = arucos3[robot_id]
                 logger.info(f"[Step 5] Robot new position after rotation:f {pos3}")
