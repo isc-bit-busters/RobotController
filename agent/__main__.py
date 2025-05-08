@@ -40,7 +40,7 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
 
 IMAGE_INTERVAL_MS = 500
 IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
-SKIP_DIST = 15
+SKIP_DIST = 30
 
 arucos_ids = {
     "gerald": {
