@@ -29,7 +29,11 @@ from agent.nav_utils import find_collision, find_path_two_bots, find_waiting_poi
 from .logAgent import send_log_message
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%H:%M:%S.%f",   
+)
 logger = logging.getLogger("AlphaBotAgent")
 
 # Enable SPADE and XMPP-specific logging
@@ -41,6 +45,7 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
 IMAGE_INTERVAL_MS = 500
 IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
 SKIP_DIST = 30
+GOAL_WAIT_DIST = 80
 
 arucos_ids = {
     "gerald": {
@@ -104,6 +109,8 @@ class AlphaBotAgent(Agent):
             await self.send(msg)
             # send_log_message("Requesting image from camera agent", self.agent.robot_name, msg_type="log")
 
+            logger.info(f"[Behavior] Requesting image from camera agent on thread {thread_id}...")
+
             msg = await self.receive(timeout=10)
             
             # thread_id = str(uuid.uuid4())
@@ -151,7 +158,7 @@ class AlphaBotAgent(Agent):
                     if self.agent.stuck_counter > 1:
                         logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving back.")
                         self.agent.alphabot.move_back(1)
-                        self.agent.alphabot.turn_left(0.1)
+                        self.agent.alphabot.turn_left(0.5)
                     else:
                         logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving forward.")
                         self.agent.alphabot.advance(2)
@@ -188,15 +195,15 @@ class AlphaBotAgent(Agent):
                     other_delta_x = 999
                     other_delta_y = 999
 
-
                 delta_x = abs(self.agent.last_position["x"] - robot_pos["x"])
                 delta_y = abs(self.agent.last_position["y"] - robot_pos["y"])
                 logger.info(f"[Behavior] Delta X: {delta_x}, Delta Y: {delta_y}")
                 if not self.agent.we_waited and delta_x <= 0.5 and delta_y <= 0.5:
                     logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
                     self.agent.alphabot.move_back(1)
-                    self.agent.alphabot.turn_left(0.1)
+                    self.agent.alphabot.turn_left(0.5)
                     return
+
                 if self.agent.last_position == robot_pos:
                     logger.info("[Behavior] Same position as before, skipping image.")
                     
@@ -212,6 +219,17 @@ class AlphaBotAgent(Agent):
                 ground_other_robot_pos = (int(ground_other_robot_pos[0]), int(ground_other_robot_pos[1]))
                 
                 logger.info(f"[Behaviour] going from {ground_robot_pos} to {goal_pos}")
+
+                dist_to_goal = math.sqrt(
+                    (goal_pos["x"] - ground_robot_pos["x"]) ** 2 + (goal_pos["y"] - ground_robot_pos["y"]) ** 2
+                )
+
+                other_dist_to_goal = math.sqrt(
+                    (other_goal_pos["x"] - ground_other_robot_pos["x"]) ** 2 + (other_goal_pos["y"] - ground_other_robot_pos["y"]) ** 2
+                )
+
+                logger.info(f"[Behavior] Distance to goal: {dist_to_goal}")
+                logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal}")
 
                 # path = find_path((ground_robot_pos[0], 0, ground_robot_pos[1]), (goal_pos["x"], 0, goal_pos["y"]), *self.agent.navmesh)
 
@@ -332,6 +350,17 @@ class AlphaBotAgent(Agent):
                     logger.info("Path empty?????")
                     return
 
+                # Is the robot about to reach the goal? 
+                if next_waypoint_id == len(path) - 1:
+                    logger.info("[Behavior] We're about to reach the goal!")
+
+                    if other_dist_to_goal > GOAL_WAIT_DIST:
+                        logger.info("[Behavior] Other robot is not ready to cross yet - waiting for them.")
+                        path = path[0]
+                    else:
+                        logger.info("[Behavior] Other robot is ready to cross - let's go!")
+                        
+
                 next_waypoint_id = 1
                 next_waypoint = path[0] if len(path) == 1 else path[next_waypoint_id]
                 last_waypoint = path[-1]
@@ -358,10 +387,13 @@ class AlphaBotAgent(Agent):
               
                 time_to_move = self.agent.alphabot.get_move_time(dist_to_next_waypoint)
 
+
                 logger.info(f"[Behavior] Next waypoint: #{next_waypoint_id} {next_waypoint}")
                 logger.info(f"[Behavior] Current position: {robot_pos}")
                 logger.info(f"[Behavior] Distance to next waypoint: {dist_to_next_waypoint}")
                 logger.info(f"[Behavior] Time to next waypoint: {time_to_move} seconds")
+                        
+                    
 
                 #region Visualization
 
