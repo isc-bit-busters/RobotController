@@ -221,11 +221,11 @@ class AlphaBotAgent(Agent):
                 logger.info(f"[Behaviour] going from {ground_robot_pos} to {goal_pos}")
 
                 dist_to_goal = math.sqrt(
-                    (goal_pos["x"] - ground_robot_pos["x"]) ** 2 + (goal_pos["y"] - ground_robot_pos["y"]) ** 2
+                    (goal_pos["x"] - ground_robot_pos[0]) ** 2 + (goal_pos["y"] - ground_robot_pos[1]) ** 2
                 )
 
                 other_dist_to_goal = math.sqrt(
-                    (other_goal_pos["x"] - ground_other_robot_pos["x"]) ** 2 + (other_goal_pos["y"] - ground_other_robot_pos["y"]) ** 2
+                    (other_goal_pos["x"] - ground_other_robot_pos[0]) ** 2 + (other_goal_pos["y"] - ground_other_robot_pos[1]) ** 2
                 )
 
                 logger.info(f"[Behavior] Distance to goal: {dist_to_goal}")
