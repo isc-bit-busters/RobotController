@@ -158,7 +158,7 @@ class AlphaBotAgent(Agent):
                     if self.agent.stuck_counter > 1:
                         logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving back.")
                         self.agent.alphabot.move_back(1)
-                        self.agent.alphabot.turn_left(self.agent.get_rotation_time(45))
+                        self.agent.alphabot.turn_left(self.agent.alphabot.get_rotation_time(45))
                     else:
                         logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving forward.")
                         self.agent.alphabot.advance(2)
@@ -206,7 +206,7 @@ class AlphaBotAgent(Agent):
                 if not self.agent.we_waited and delta_x <= 0.5 and delta_y <= 0.5:
                     logger.info(f"[Behavior] Robot stuck, trying to unstuck.")
                     self.agent.alphabot.move_back(1)
-                    self.agent.alphabot.turn_left(self.agent.get_rotation_time(45))
+                    self.agent.alphabot.turn_left(self.agent.alphabot.get_rotation_time(45))
                     return
 
                 if self.agent.last_position == robot_pos:
