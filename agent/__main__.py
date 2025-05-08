@@ -67,6 +67,7 @@ class AlphaBotAgent(Agent):
         # self.focal_length = None
         # self.running = True  
         self.last_position = []
+        self.stuck_counter = 0
     async def setup(self):
         logger.info(f"HELLO MY NAME IS {self.robot_name}")
         logger.info(f"[Agent] AlphaBotAgent {self.jid} starting setup...")
@@ -141,8 +142,20 @@ class AlphaBotAgent(Agent):
 
                 if arucos_ids[self.agent.robot_name]["robot"] not in arucos:
                     logger.warning("[Behavior] ⚠ Robot ID not found in image.")
-                    self.agent.alphabot.advance(2)
+
+                    if self.agent.stuck_counter > 2:
+                        logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving back.")
+                        self.agent.alphabot.move_back(1)
+                        self.agent.alphabot.turn_left(0.1)
+                    else:
+                        logger.info(f"[Behavior] Stuck for {self.agent.stuck_counter} ticks, trying to unstuck by moving forward.")
+                        self.agent.alphabot.advance(2)
+
+                    self.agent.stuck_counter += 1
                     return
+                else:
+                    self.agent.stuck_counter = 0
+
                 
                 if arucos_ids[self.agent.robot_name]["goal"] not in arucos:
                     logger.warning("[Behavior] ⚠ Goal ID not found in image.")
