@@ -44,8 +44,8 @@ for log_name in ["spade", "aioxmpp", "xmpp"]:
 
 IMAGE_INTERVAL_MS = 500
 IMAGE_OFFSET_MS = IMAGE_INTERVAL_MS / 2
-SKIP_DIST = 30
-GOAL_WAIT_DIST = 120
+SKIP_DIST = 40
+GOAL_WAIT_DIST = 80
 
 arucos_ids = {
     "gerald": {
@@ -625,7 +625,7 @@ class AlphaBotAgent(Agent):
 
                 cv2.imwrite("/agent/navmesh_image_base.jpg", img0)
                 print(f"img0 shape: {img0.shape}")
-                # img0 = cv2.resize(img0, (1024,576), img0)
+                img0 = cv2.resize(img0, (1024,576), img0)
                
                 thread_id = str(uuid.uuid4())
                 msg = Message(to="camera_agent@prosody") 
@@ -808,8 +808,8 @@ class AlphaBotAgent(Agent):
 
             # Wait for a message from the other agent
             
-            if False:
-                t = 2  # seconds
+            if True:
+                t = 0.5  # seconds
                 # === STEP 2: Move the robot ===
                 logger.info("[Step 2] Moving robot forward...")
                 self.agent.alphabot.advance(t)  # Move for 2 seconds
