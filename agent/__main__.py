@@ -233,9 +233,6 @@ class AlphaBotAgent(Agent):
                     (other_goal_pos["x"] - ground_other_robot_pos[0]) ** 2 + (other_goal_pos["y"] - ground_other_robot_pos[1]) ** 2
                 )
 
-                logger.info(f"[Behavior] Distance to goal: {dist_to_goal_straight}")
-                logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal_straight}")
-
                 # path = find_path((ground_robot_pos[0], 0, ground_robot_pos[1]), (goal_pos["x"], 0, goal_pos["y"]), *self.agent.navmesh)
 
                 paths = find_path_two_bots(
@@ -279,6 +276,9 @@ class AlphaBotAgent(Agent):
 
                 logger.info(f"[Behavior] Distance to goal: {our_dist_to_goal}")
                 logger.info(f"[Behavior] Other bot's distance to goal: {other_dist_to_goal}")
+
+                logger.info(f"[Behavior] Distance to goal straight: {dist_to_goal_straight}")
+                logger.info(f"[Behavior] Other bot's distance to goal straight: {other_dist_to_goal_straight}")
 
                 logger.info(f"[Behavior] We should wait: {self.agent.we_wait}")
 
@@ -386,7 +386,7 @@ class AlphaBotAgent(Agent):
                 time_to_move = self.agent.alphabot.get_move_time(dist_to_next_waypoint)
                         
                 # Is the robot about to reach the goal? 
-                if next_waypoint_id == len(path) - 1:
+                if next_waypoint_id == len(path) - 1 or our_dist_to_goal < GOAL_WAIT_DIST:
                     logger.info("[Behavior] We're about to reach the goal!")
 
                     if other_dist_to_goal > GOAL_WAIT_DIST:
@@ -422,6 +422,14 @@ class AlphaBotAgent(Agent):
                     dot_color = (0, 255, 255) if i > next_waypoint_id else (0, 0, 255)
                     cv2.circle(img, pt1, 5, dot_color, -1)
 
+                # Draw the other bot's path
+                for i in range(len(other_path) - 1):
+                    pt1 = (int(other_path[i][0]), int(other_path[i][2]))
+                    pt2 = (int(other_path[i + 1][0]), int(other_path[i + 1][2]))
+                    cv2.line(img, pt1, pt2, (255, 0, 255), 2)                    
+
+                    cv2.circle(img, pt1, 5, (0, 0, 255), -1)
+
                 # Robot ground pos in light blue, and image pos in dark blue
                 cv2.circle(img, (int(robot_pos["x"]), int(robot_pos["y"])), 5, (255, 0, 0), -1)
                 cv2.circle(img, (ground_robot_pos[0], ground_robot_pos[1]), 5, (255, 200, 10), -1)
@@ -456,6 +464,9 @@ class AlphaBotAgent(Agent):
 
                 cv2.imwrite(f"/agent/path_image_{int(time.time())}.jpg", img)
                 cv2.imwrite(f"/agent/path_image_latest.jpg", img)
+
+
+                # send_log_message("Hello from " + self.robot_name, self.robot_name, msg_type="log")
 
                 #endregion 
 
